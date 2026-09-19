@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roadbook</title>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+
+<style>
+  /* Topographic sheet by day, highway sign by night.
+     Everything routes through Pico's own variables, so its components follow along. */
+  [data-theme="light"]{
+    --pico-background-color:#F6F1E4;
+    --pico-color:#3D3020;
+    --pico-h1-color:#3D3020; --pico-h2-color:#3D3020;
+    --pico-muted-color:#6B5A42;
+    --pico-muted-border-color:#CDBC9B;
+    --pico-card-background-color:#FDFBF4;
+    --pico-card-border-color:#CDBC9B;
+    --pico-card-sectioning-background-color:#F1EAD9;
+    --pico-border-color:#CDBC9B;
+    --pico-primary:#2F6B4F;
+    --pico-primary-background:#2F6B4F;
+    --pico-primary-border:#2F6B4F;
+    --pico-primary-inverse:#FDFBF4;
+    --pico-primary-hover-background:#26583F;
+    --pico-primary-focus:rgba(47,107,79,.25);
+    --rule:#8A6A3B; --track:#B23A2E; --map-bg:#E8E2D4; --switch-bg:#E9E1CE;
+  }
+  [data-theme="dark"]{
+    --pico-background-color:#0A2A20;
+    --pico-color:#FFFFFF;
+    --pico-h1-color:#FFFFFF; --pico-h2-color:#FFFFFF;
+    --pico-muted-color:#B9D2C7;
+    --pico-muted-border-color:#2E5B4B;
+    --pico-card-background-color:#0E3B2E;
+    --pico-card-border-color:#2E5B4B;
+    --pico-card-sectioning-background-color:#0C3327;
+    --pico-border-color:#2E5B4B;
+    --pico-primary:#F5C518;
+    --pico-primary-background:#F5C518;
+    --pico-primary-border:#F5C518;
+    --pico-primary-inverse:#0E3B2E;
+    --pico-primary-hover-background:#FFD64A;
+    --pico-primary-focus:rgba(245,197,24,.3);
+    --rule:#7FA99A; --track:#E2553F; --map-bg:#1D2B26; --switch-bg:#1C4A3B;
+  }
+
+  :root{
+    --pico-font-family:"Source Serif 4",Georgia,serif;
+    --pico-font-size:106.25%;
+    --pico-border-radius:3px;
+  }
+  h1,h2,.stat,.actions a,.actions button{
+    font-family:"Archivo Narrow",Haettenschweiler,"Arial Narrow",sans-serif}
+
+  .masthead{border-bottom:3px double var(--rule);padding-bottom:1.3rem;margin-bottom:2rem}
+  .masthead h1{font-weight:700;font-size:clamp(2.2rem,7vw,3.4rem);line-height:.95;margin:0;
+    display:flex;align-items:center;gap:.6rem}
+  .masthead h1 .lucide{width:.78em;height:.78em;color:var(--pico-primary);flex-shrink:0}
+  .masthead p{margin:.7rem 0 0;color:var(--pico-muted-color);max-width:52ch}
+  .top-row{display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-start}
+
+  /* Appearance switch, same geometry as VitePress: 40x22 pill, 18px knob, 12px icon. */
+  .appearance{display:flex;align-items:center;gap:.6rem;flex-shrink:0;padding-top:.35rem}
+  .switch{position:relative;width:40px;height:22px;margin:0;padding:0;
+    border-radius:11px;border:1px solid var(--rule);background:var(--switch-bg);
+    cursor:pointer;transition:border-color .25s,background-color .25s}
+  .switch:focus-visible{outline:2px solid var(--pico-primary);outline-offset:2px}
+  .knob{position:absolute;top:1px;left:1px;width:18px;height:18px;border-radius:50%;
+    background:var(--pico-card-background-color);box-shadow:0 1px 2px rgba(0,0,0,.25);
+    transition:transform .25s}
+  .knob .lucide{position:absolute;top:2px;left:2px;width:12px;height:12px;
+    color:var(--pico-color);transition:opacity .25s}
+  .knob .moon{opacity:0}
+  [data-theme="dark"] .knob{transform:translateX(18px)}
+  [data-theme="dark"] .knob .sun{opacity:0}
+  [data-theme="dark"] .knob .moon{opacity:1}
+  .auto{width:auto;margin:0;padding:0;border:0;background:none;font-size:.8rem;
+    color:var(--pico-muted-color);text-decoration:underline dotted;cursor:pointer}
+  .auto[hidden]{display:none}
+
+  article.route{padding:0;overflow:hidden}
+  article.route>header{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .8rem;margin:0}
+  article.route>header h2{margin:0;font-weight:700;font-size:1.7rem;flex:1}
+
+  .stat{display:inline-flex;align-items:center;gap:.35rem;white-space:nowrap;font-size:.95rem;
+    color:var(--pico-muted-color);border:1px solid var(--rule);
+    border-radius:var(--pico-border-radius);padding:.12rem .55rem}
+  .stat b{color:var(--pico-primary);font-weight:700}
+  .stat .lucide{width:15px;height:15px}
+  .stat[hidden]{display:none}
+  .stat.failed{color:var(--track);border-color:var(--track)}
+
+  .body{display:grid;grid-template-columns:1.4fr 1fr}
+  .map{height:440px;background:var(--map-bg);border-right:1px solid var(--pico-card-border-color)}
+  .side{padding:1.15rem 1.3rem;display:flex;flex-direction:column}
+  .blurb{color:var(--pico-muted-color);margin-bottom:1.2rem}
+
+  ol.stops{list-style:none;margin:0 0 1.4rem;padding:0;position:relative}
+  ol.stops::before{content:"";position:absolute;left:13px;top:1.4rem;bottom:1.4rem;width:1px;
+    background:var(--rule);opacity:.45}
+  ol.stops li{position:relative;display:flex;align-items:flex-start;gap:.75rem;
+    padding-bottom:.7rem;line-height:1.3}
+  ol.stops li:last-child{padding-bottom:0}
+  .pin{width:27px;height:27px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;
+    border:1px solid var(--rule);background:var(--pico-card-background-color);
+    color:var(--pico-muted-color)}
+  .pin .lucide{width:14px;height:14px}
+  ol.stops small{display:block;color:var(--pico-muted-color)}
+  li.me{color:var(--pico-muted-color)}
+  li.me .pin{border-style:dashed;border-color:var(--track);color:var(--track)}
+  li.me.found{color:var(--pico-color)}
+  li.me.found .pin{background:var(--track);border-style:solid;border-color:var(--track);color:#fff}
+
+  .actions{margin-top:auto;display:flex;flex-wrap:wrap;gap:.6rem}
+  .actions a[role="button"],.actions button{width:auto;margin:0;display:inline-flex;
+    align-items:center;gap:.4rem;font-weight:700;padding:.5rem 1rem}
+  .actions .lucide{width:17px;height:17px}
+
+  .notice{color:var(--track);margin:.8rem 0 0;font-size:.9rem}
+  .notice:empty{display:none}
+
+  .colophon{border-top:1px solid var(--pico-border-color);margin-top:2.4rem;padding-top:1rem;
+    color:var(--pico-muted-color);font-size:.9rem;max-width:64ch;display:flex;gap:.6rem}
+  .colophon .lucide{width:17px;height:17px;flex-shrink:0;margin-top:.15rem}
+
+  .leaflet-container{font-family:inherit;background:var(--map-bg)}
+  .leaflet-popup-content{font-family:inherit;margin:10px 14px}
+
+  @media (max-width:768px){
+    .body{grid-template-columns:1fr}
+    .map{height:290px;border-right:0;border-bottom:1px solid var(--pico-card-border-color)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+  }
+</style>
+</head>
+
+<body>
+<main class="container">
+
+  <header class="masthead">
+    <div class="top-row">
+      <div style="flex:1">
+        <h1><i data-lucide="compass" aria-hidden="true"></i>Roadbook</h1>
+        <p>Motorcycle day trips that start and end wherever you happen to be.</p>
+      </div>
+      <div class="appearance">
+        <button type="button" class="switch" role="switch" aria-checked="false"
+                aria-label="Switch to dark theme" onclick="toggleTheme()">
+          <span class="knob">
+            <i data-lucide="sun"  class="sun"  aria-hidden="true"></i>
+            <i data-lucide="moon" class="moon" aria-hidden="true"></i>
+          </span>
+        </button>
+        <button type="button" class="auto" hidden onclick="pickTheme('auto')">auto</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- One <article data-route> per trip. Coordinates live on the <li> elements,
+       so the script reads the page itself instead of a parallel list. -->
+  <article class="route" id="do-bambu-as-aguas" data-route>
+    <header>
+      <h2>Do Bambu às Águas</h2>
+      <span class="stat" data-distance aria-live="polite"><i data-lucide="route"></i>measuring…</span>
+      <span class="stat" data-duration hidden><i data-lucide="clock-4"></i>—</span>
+    </header>
+
+    <div class="body">
+      <div class="map"></div>
+
+      <div class="side">
+        <p class="blurb">Cheese at Itatiba, the bamboo tunnel at Morungaba, coffee and a
+           lookout up in the Circuito das Águas, an abandoned railway station at Santo
+           Aleixo, then home past Fazenda Atalaia.</p>
+
+        <ol class="stops">
+          <li class="me"><span class="pin"><i data-lucide="crosshair"></i></span>
+            <span><span class="name">Your location</span><small>wherever you set off</small></span></li>
+
+          <li data-lat="-22.9415693" data-lon="-46.8774616" data-search="Loja Atilatte">
+            <span class="pin"><i data-lucide="store"></i></span>
+            <span><span class="name">Loja Atilatte</span><small>Itatiba</small></span></li>
+
+          <li data-lat="-22.9897357" data-lon="-46.8451747" data-search="Posto Itatiba Mall">
+            <span class="pin"><i data-lucide="fuel"></i></span>
+            <span><span class="name">Posto Itatiba Mall</span><small>Itatiba</small></span></li>
+
+          <li data-lat="-22.8963758" data-lon="-46.7870741" data-search="Túnel de Bambu, Morungaba SP">
+            <span class="pin"><i data-lucide="trees"></i></span>
+            <span><span class="name">Túnel de Bambu</span><small>Morungaba</small></span></li>
+
+          <li data-lat="-22.5616725" data-lon="-46.6219739" data-search="Bioparque Mata Atlântica">
+            <span class="pin"><i data-lucide="sprout"></i></span>
+            <span><span class="name">Bioparque Mata Atlântica</span><small>Águas de Lindóia</small></span></li>
+
+          <li data-lat="-22.5208323" data-lon="-46.6539595" data-search="Supreme Café Container">
+            <span class="pin"><i data-lucide="coffee"></i></span>
+            <span><span class="name">Supreme Café Container</span><small>Lindóia</small></span></li>
+
+          <li data-lat="-22.5393435" data-lon="-46.6715610" data-search="Mirante de Lindóia">
+            <span class="pin"><i data-lucide="mountain"></i></span>
+            <span><span class="name">Mirante de Lindóia</span><small>Lindóia</small></span></li>
+
+          <li data-lat="-22.5709798" data-lon="-46.7499804" data-search="Antiga Estação Ferroviária de Santo Aleixo">
+            <span class="pin"><i data-lucide="train-front"></i></span>
+            <span><span class="name">Antiga Estação de Santo Aleixo</span><small>Amparo</small></span></li>
+
+          <li data-lat="-22.6656123" data-lon="-46.7779671" data-search="Fazenda Atalaia">
+            <span class="pin"><i data-lucide="milk"></i></span>
+            <span><span class="name">Fazenda Atalaia</span><small>Amparo</small></span></li>
+
+          <li class="me"><span class="pin"><i data-lucide="crosshair"></i></span>
+            <span><span class="name">Your location</span><small>back to the same spot</small></span></li>
+        </ol>
+
+        <div class="actions">
+          <a role="button" href="#" data-open><i data-lucide="navigation"></i>Open in Google Maps</a>
+          <button class="secondary outline" data-gpx disabled><i data-lucide="download"></i>Download GPX</button>
+        </div>
+
+        <p class="notice" role="status"></p>
+      </div>
+    </div>
+  </article>
+
+  <footer class="colophon">
+    <i data-lucide="info" aria-hidden="true"></i>
+    <span>Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>
+      contributors, dark basemap by Esri, routing by the OSRM demo server. Distance and
+      time are car estimates — on a bike, add the coffee stops.</span>
+  </footer>
+
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/lucide@1.47.0/dist/umd/lucide.min.js"></script>
+
+<script>
+/* Plain JavaScript on purpose. Pico styles the page, Lucide draws the icons,
+   Leaflet draws the map. Nothing here needs a framework. */
+
+const OSRM = "https://router.project-osrm.org/route/v1/driving/";
+
+const PALETTE = {
+  light: { track:"#B23A2E", stroke:"#3D3020", fill:"#FDFBF4" },
+  dark:  { track:"#E2553F", stroke:"#E8E2D4", fill:"#16211C" }
+};
+
+const $  = (root, sel) => (typeof root === "string" ? document : root).querySelector(typeof root === "string" ? root : sel);
+const $$ = (root, sel) => Array.from((typeof root === "string" ? document : root).querySelectorAll(typeof root === "string" ? root : sel));
+const icons = () => { if (window.lucide) lucide.createIcons(); };
+
+const theme = () =>
+  document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+
+/* ---------------- theme ----------------
+   Follows the clock until the switch is flipped; the flip is stored. The small
+   "auto" link hands control back to the clock. Each change fires a "theme" event
+   on the document; every map listens for it. */
+
+function themeByClock() {
+  const h = new Date().getHours();
+  return (h >= 18 || h < 6) ? "dark" : "light";
+}
+
+let themeMode = "auto";
+try { themeMode = localStorage.getItem("theme") || "auto"; } catch (e) {}
+if (["auto", "light", "dark"].indexOf(themeMode) === -1) themeMode = "auto";
+
+function applyTheme() {
+  document.documentElement.setAttribute("data-theme",
+    themeMode === "auto" ? themeByClock() : themeMode);
+  const dark = theme() === "dark";
+  const sw = $(".switch");
+  sw.setAttribute("aria-checked", String(dark));
+  sw.setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
+  $(".auto").hidden = themeMode === "auto";
+  document.dispatchEvent(new CustomEvent("theme"));
+}
+
+function pickTheme(mode) {
+  themeMode = mode;
+  try { localStorage.setItem("theme", mode); } catch (e) {}
+  applyTheme();
+}
+
+function toggleTheme() {
+  pickTheme(theme() === "dark" ? "light" : "dark");
+}
+
+setInterval(() => { if (themeMode === "auto") applyTheme(); }, 300000);
+
+/* ---------------- Google Maps hand-off ---------------- */
+
+function mapsLink(stops, here) {
+  const point = s => s.search || `${s.lat},${s.lon}`;
+  const q = new URLSearchParams({ api: "1", travelmode: "driving" });
+  if (here) {
+    const me = `${here.lat},${here.lon}`;
+    q.set("origin", me); q.set("destination", me);
+    q.set("waypoints", stops.map(point).join("|"));
+  } else {
+    q.set("destination", point(stops[stops.length - 1]));
+    q.set("waypoints", stops.slice(0, -1).map(point).join("|"));
+  }
+  return "https://www.google.com/maps/dir/?" + q.toString();
+}
+
+/* Android hands straight to the Maps app; elsewhere the https link is a universal link. */
+function openMaps(url) {
+  if (/Android/i.test(navigator.userAgent || "")) {
+    window.location.href = "intent://" + url.replace(/^https:\/\//, "") +
+      "#Intent;scheme=https;package=com.google.android.apps.maps" +
+      ";S.browser_fallback_url=" + encodeURIComponent(url) + ";end";
+    return;
+  }
+  const win = window.open(url, "_blank", "noopener");
+  if (!win) window.location.href = url;
+}
+
+function locate() {
+  return new Promise((ok, fail) => {
+    if (!navigator.geolocation) return fail({ code: 0 });
+    navigator.geolocation.getCurrentPosition(
+      p => ok({ name:"Your location", lat:+p.coords.latitude.toFixed(6), lon:+p.coords.longitude.toFixed(6) }),
+      fail, { enableHighAccuracy:false, timeout:9000, maximumAge:300000 });
+  });
+}
+
+function downloadGpx(slug, name, points, line) {
+  const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="roadbook" xmlns="http://www.topografix.com/GPX/1/1">
+${points.map(p => `  <wpt lat="${p.lat}" lon="${p.lon}"><name>${esc(p.name)}</name></wpt>`).join("\n")}
+  <trk><name>${esc(name)}</name><trkseg>
+${line.map(([lat, lon]) => `      <trkpt lat="${lat}" lon="${lon}"/>`).join("\n")}
+  </trkseg></trk>
+</gpx>`;
+  const url = URL.createObjectURL(new Blob([gpx], { type: "application/gpx+xml" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = slug + ".gpx"; a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ---------------- one trip ---------------- */
+
+function buildRoute(article) {
+  if (article.dataset.ready) return;
+  article.dataset.ready = "1";
+
+  const slug = article.id;
+  const name = $(article, "h2").textContent.trim();
+  const stops = $$(article, "li[data-lat]").map(li => ({
+    name: $(li, ".name").textContent.trim(),
+    lat: +li.dataset.lat, lon: +li.dataset.lon, search: li.dataset.search || ""
+  }));
+
+  const distanceEl = $(article, "[data-distance]");
+  const durationEl = $(article, "[data-duration]");
+  const noticeEl   = $(article, ".notice");
+  const gpxButton  = $(article, "[data-gpx]");
+  const openButton = $(article, "[data-open]");
+
+  openButton.href = mapsLink(stops, null);
+
+  const map = L.map($(article, ".map"), { scrollWheelZoom: false });
+
+  const tiles = {
+    light: L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }),
+    dark: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 16, attribution: 'Esri, HERE, Garmin, © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' })
+  };
+
+  const markers = stops.map(s =>
+    L.circleMarker([s.lat, s.lon], { radius: 6, weight: 2, fillOpacity: 1 })
+      .addTo(map).bindPopup(`<b>${s.name}</b>`));
+
+  let line = null, hereMarker = null, known = null;
+
+  function dressMap() {
+    const t = theme(), c = PALETTE[t];
+    Object.keys(tiles).forEach(k => {
+      if (k === t) { if (!map.hasLayer(tiles[k])) tiles[k].addTo(map); }
+      else if (map.hasLayer(tiles[k])) map.removeLayer(tiles[k]);
+    });
+    markers.forEach(m => m.setStyle({ color: c.stroke, fillColor: c.fill }));
+    if (line) line.setStyle({ color: c.track });
+    if (hereMarker) hereMarker.setStyle({ color: c.track, fillColor: c.track });
+  }
+  dressMap();
+  document.addEventListener("theme", dressMap);
+
+  function drawRoute(points) {
+    distanceEl.className = "stat";
+    distanceEl.innerHTML = '<i data-lucide="loader"></i>measuring…';
+    durationEl.hidden = true;
+    icons();
+
+    return fetch(OSRM + points.map(p => `${p.lon},${p.lat}`).join(";") + "?overview=full&geometries=geojson")
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => {
+        if (!data.routes || !data.routes.length) throw new Error("no route");
+        const r = data.routes[0];
+        const shape = r.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
+
+        if (line) line.remove();
+        line = L.polyline(shape, { color: PALETTE[theme()].track, weight: 4, opacity: .95 }).addTo(map);
+        map.fitBounds(line.getBounds(), { padding: [24, 24] });
+
+        const km = Math.round(r.distance / 1000);
+        const hours = Math.floor(r.duration / 3600);
+        const mins = Math.round((r.duration % 3600) / 60);
+        distanceEl.innerHTML = `<i data-lucide="route"></i><b>${km} km</b>`;
+        durationEl.innerHTML = `<i data-lucide="clock-4"></i>${hours}h ${String(mins).padStart(2, "0")}m`;
+        durationEl.hidden = false;
+        icons();
+
+        gpxButton.removeAttribute("disabled");
+        gpxButton.onclick = () => downloadGpx(slug, name, points, shape);
+      })
+      .catch(() => {
+        if (line) line.remove();
+        line = L.polyline(points.map(p => [p.lat, p.lon]),
+          { color: PALETTE[theme()].track, weight: 2, opacity: .7, dashArray: "5 7" }).addTo(map);
+        map.fitBounds(line.getBounds(), { padding: [24, 24] });
+        distanceEl.className = "stat failed";
+        distanceEl.innerHTML = '<i data-lucide="triangle-alert"></i>router unavailable';
+        durationEl.hidden = true;
+        icons();
+      });
+  }
+
+  drawRoute(stops);
+
+  /* One tap: find you, close the loop, hand off to Maps. */
+  openButton.addEventListener("click", event => {
+    if (known) return;
+    event.preventDefault();
+    const label = openButton.innerHTML;
+    openButton.setAttribute("aria-busy", "true");
+    noticeEl.textContent = "";
+
+    locate()
+      .then(here => {
+        known = here;
+        const c = PALETTE[theme()].track;
+        if (hereMarker) hereMarker.remove();
+        hereMarker = L.circleMarker([here.lat, here.lon],
+          { radius: 8, color: c, weight: 2, fillColor: c, fillOpacity: 1 })
+          .addTo(map).bindPopup("<b>You are here</b>");
+        $$(article, "li.me").forEach(li => li.classList.add("found"));
+        openButton.removeAttribute("aria-busy");
+        openButton.innerHTML = label;
+        openButton.href = mapsLink(stops, here);
+        drawRoute([here, ...stops, here]);
+        openMaps(openButton.href);
+      })
+      .catch(err => {
+        openButton.removeAttribute("aria-busy");
+        openButton.innerHTML = label;
+        noticeEl.textContent = err && err.code === 1
+          ? "Without your location the route starts from the device and ends at the last stop."
+          : "Couldn't get your location. Opening the simple version.";
+        openMaps(openButton.href);
+      });
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  icons();
+  applyTheme();
+  $$("[data-route]").forEach(buildRoute);
+});
+</script>
+</body>
+</html>
