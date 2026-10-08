@@ -8,14 +8,18 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.min.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css"
+      integrity="sha256-qx5w1Z7EBGW65+cDDaLzzPKBM/1QLmK9WY7vut/XpzI=" crossorigin="">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
 
 <style>
   /* Topographic sheet by day, highway sign by night.
-     Everything routes through Pico's own variables, so its components follow along. */
-  [data-theme="light"]{
+     Everything routes through Pico's own variables, so its components follow along.
+     The :root matters: Pico ships its light theme on :root:not([data-theme=dark]),
+     which outranks a bare [data-theme="light"] and would win. */
+  :root[data-theme="light"]{
     --pico-background-color:#F6F1E4;
     --pico-color:#3D3020;
     --pico-h1-color:#3D3020; --pico-h2-color:#3D3020;
@@ -31,9 +35,16 @@
     --pico-primary-inverse:#FDFBF4;
     --pico-primary-hover-background:#26583F;
     --pico-primary-focus:rgba(47,107,79,.25);
-    --rule:#8A6A3B; --track:#B23A2E; --map-bg:#E8E2D4; --switch-bg:#E9E1CE;
+    --pico-primary-hover:#26583F; --pico-primary-hover-border:#26583F;
+    --pico-primary-underline:rgba(47,107,79,.5); --pico-primary-hover-underline:#26583F;
+    --pico-text-selection-color:rgba(47,107,79,.2);
+    --pico-secondary:#6B5A42; --pico-secondary-background:#6B5A42;
+    --pico-secondary-border:#6B5A42; --pico-secondary-inverse:#FDFBF4;
+    --pico-secondary-hover:#3D3020; --pico-secondary-hover-background:#3D3020;
+    --pico-secondary-hover-border:#3D3020; --pico-secondary-focus:rgba(107,90,66,.25);
+    --rule:#8A6A3B; --track:#B23A2E; --map-bg:#F8F4F0; --switch-bg:#E9E1CE;
   }
-  [data-theme="dark"]{
+  :root[data-theme="dark"]{
     --pico-background-color:#0A2A20;
     --pico-color:#FFFFFF;
     --pico-h1-color:#FFFFFF; --pico-h2-color:#FFFFFF;
@@ -49,7 +60,14 @@
     --pico-primary-inverse:#0E3B2E;
     --pico-primary-hover-background:#FFD64A;
     --pico-primary-focus:rgba(245,197,24,.3);
-    --rule:#7FA99A; --track:#E2553F; --map-bg:#1D2B26; --switch-bg:#1C4A3B;
+    --pico-primary-hover:#FFD64A; --pico-primary-hover-border:#FFD64A;
+    --pico-primary-underline:rgba(245,197,24,.5); --pico-primary-hover-underline:#FFD64A;
+    --pico-text-selection-color:rgba(245,197,24,.25);
+    --pico-secondary:#B9D2C7; --pico-secondary-background:#B9D2C7;
+    --pico-secondary-border:#B9D2C7; --pico-secondary-inverse:#0E3B2E;
+    --pico-secondary-hover:#FFFFFF; --pico-secondary-hover-background:#FFFFFF;
+    --pico-secondary-hover-border:#FFFFFF; --pico-secondary-focus:rgba(185,210,199,.25);
+    --rule:#7FA99A; --track:#E2553F; --map-bg:#163E31; --switch-bg:#1C4A3B;
   }
 
   :root{
@@ -99,7 +117,8 @@
   .stat.failed{color:var(--track);border-color:var(--track)}
 
   .body{display:grid;grid-template-columns:1.4fr 1fr}
-  .map{height:440px;background:var(--map-bg);border-right:1px solid var(--pico-card-border-color)}
+  /* No fixed height: the grid row stretches the map to match the stop list beside it. */
+  .map{min-height:440px;background:var(--map-bg);border-right:1px solid var(--pico-card-border-color)}
   .side{padding:1.15rem 1.3rem;display:flex;flex-direction:column}
   .blurb{color:var(--pico-muted-color);margin-bottom:1.2rem}
 
@@ -118,6 +137,8 @@
   li.me .pin{border-style:dashed;border-color:var(--track);color:var(--track)}
   li.me.found{color:var(--pico-color)}
   li.me.found .pin{background:var(--track);border-style:solid;border-color:var(--track);color:#fff}
+  li.via{color:var(--pico-muted-color);font-size:.9rem}
+  li.via .pin{border-style:dotted}
 
   .actions{margin-top:auto;display:flex;flex-wrap:wrap;gap:.6rem}
   .actions a[role="button"],.actions button{width:auto;margin:0;display:inline-flex;
@@ -133,10 +154,12 @@
 
   .leaflet-container{font-family:inherit;background:var(--map-bg)}
   .leaflet-popup-content{font-family:inherit;margin:10px 14px}
+  /* Leaflet's zoom links carry role="button", so Pico pads them like real buttons. */
+  .leaflet-bar a[role="button"]{padding:0;border-top:0;border-left:0;border-right:0}
 
   @media (max-width:768px){
     .body{grid-template-columns:1fr}
-    .map{height:290px;border-right:0;border-bottom:1px solid var(--pico-card-border-color)}
+    .map{height:290px;min-height:0;border-right:0;border-bottom:1px solid var(--pico-card-border-color)}
   }
   @media (prefers-reduced-motion:reduce){
     *{animation-duration:.01ms !important;transition-duration:.01ms !important}
@@ -224,7 +247,61 @@
         </ol>
 
         <div class="actions">
-          <a role="button" href="#" data-open><i data-lucide="navigation"></i>Open in Google Maps</a>
+          <a role="button" href="#" target="_blank" rel="noopener" data-open>
+            <i data-lucide="navigation"></i>Open in Google Maps</a>
+          <button class="secondary outline" data-gpx disabled><i data-lucide="download"></i>Download GPX</button>
+        </div>
+
+        <p class="notice" role="status"></p>
+      </div>
+    </div>
+  </article>
+
+  <article class="route" id="pico-do-lobo-guara" data-route>
+    <header>
+      <h2>Pico do Lobo Guará</h2>
+      <span class="stat" data-distance aria-live="polite"><i data-lucide="route"></i>measuring…</span>
+      <span class="stat" data-duration hidden><i data-lucide="clock-4"></i>—</span>
+    </header>
+
+    <div class="body">
+      <div class="map"></div>
+
+      <div class="side">
+        <p class="blurb">Out through Jaguariúna and Amparo, south on the Rodovia José Augusto
+           Freire past Piracaia, then up to the Pico do Lobo Guará above Extrema.</p>
+
+        <ol class="stops">
+          <li class="me"><span class="pin"><i data-lucide="crosshair"></i></span>
+            <span><span class="name">Your location</span><small>wherever you set off</small></span></li>
+
+          <li class="via" data-lat="-22.7327801" data-lon="-47.0153921" data-search="-22.7327801,-47.0153921">
+            <span class="pin"><i data-lucide="milestone"></i></span>
+            <span><span class="name">Via</span><small>Jaguariúna</small></span></li>
+
+          <li class="via" data-lat="-22.708769" data-lon="-46.9853828" data-search="-22.708769,-46.9853828">
+            <span class="pin"><i data-lucide="milestone"></i></span>
+            <span><span class="name">Rodovia João Beira</span><small>Jaguariúna</small></span></li>
+
+          <li class="via" data-lat="-22.7297508" data-lon="-46.764511" data-search="-22.7297508,-46.764511">
+            <span class="pin"><i data-lucide="milestone"></i></span>
+            <span><span class="name">SP-095 / SP-360</span><small>Amparo</small></span></li>
+
+          <li class="via" data-lat="-23.0439531" data-lon="-46.337684" data-search="-23.0439531,-46.337684">
+            <span class="pin"><i data-lucide="milestone"></i></span>
+            <span><span class="name">Rodovia José Augusto Freire</span><small>Piracaia</small></span></li>
+
+          <li data-lat="-22.8167434" data-lon="-46.2491037" data-search="Pico Do Lobo Guará">
+            <span class="pin"><i data-lucide="mountain"></i></span>
+            <span><span class="name">Pico do Lobo Guará</span><small>Extrema</small></span></li>
+
+          <li class="me"><span class="pin"><i data-lucide="crosshair"></i></span>
+            <span><span class="name">Your location</span><small>back to the same spot</small></span></li>
+        </ol>
+
+        <div class="actions">
+          <a role="button" href="#" target="_blank" rel="noopener" data-open>
+            <i data-lucide="navigation"></i>Open in Google Maps</a>
           <button class="secondary outline" data-gpx disabled><i data-lucide="download"></i>Download GPX</button>
         </div>
 
@@ -236,25 +313,99 @@
   <footer class="colophon">
     <i data-lucide="info" aria-hidden="true"></i>
     <span>Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>
-      contributors, dark basemap by Esri, routing by the OSRM demo server. Distance and
-      time are car estimates — on a bike, add the coffee stops.</span>
+      contributors, basemaps by <a href="https://openfreemap.org">OpenFreeMap</a> ©
+      <a href="https://www.openmaptiles.org/">OpenMapTiles</a>, routing by the OSRM demo server.
+      Distance and time are car estimates — on a bike, add the coffee stops.</span>
   </footer>
 
 </main>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"
+        integrity="sha256-RamwepGJzlYFTGIKlHzPQeKR5YyV6bYVM7dAqqZe5cs=" crossorigin=""></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js"
+        integrity="sha256-Hmz4yz61/ZCYeaob82o4P7UGyaWy27+rq85lopTdH8s=" crossorigin=""></script>
 <script src="https://unpkg.com/lucide@1.47.0/dist/umd/lucide.min.js"></script>
 
 <script>
 /* Plain JavaScript on purpose. Pico styles the page, Lucide draws the icons,
-   Leaflet draws the map. Nothing here needs a framework. */
+   Leaflet draws the map over an OpenFreeMap basemap that MapLibre renders.
+   Nothing here needs a framework. */
 
 const OSRM = "https://router.project-osrm.org/route/v1/driving/";
 
+/* Vector basemaps, no key: OpenFreeMap's Liberty by day; its Fiord by night, repainted
+   layer by layer in the night palette so the map belongs to the card around it. */
+const LIBERTY = "https://tiles.openfreemap.org/styles/liberty";
+const FIORD = "https://tiles.openfreemap.org/styles/fiord";
+
+/* Fiord layer id → colour. Ground and water in the card greens, roads in the border and
+   rule tones, motorways a step brighter. */
+const NIGHT_FILLS = {
+  "background": "#163E31", "water": "#0A2B33", "waterway": "#13414D",
+  "landcover_wood": "rgba(10,42,32,.55)", "landcover_ice_shelf": "#163E31",
+  "park": "#1B4638", "park_outline": "#24533F", "building": "rgba(10,42,32,.6)",
+  "highway_path": "#2E5B4B", "highway_minor": "#2E5B4B",
+  "highway_major_casing": "#3E6A5A", "highway_major_inner": "#1F4A3B",
+  "highway_major_subtle": "#24533F", "highway_motorway_casing": "#5E8A79",
+  "highway_motorway_inner": "#2E5B4B", "highway_motorway_subtle": "rgba(127,169,154,.2)",
+  "tunnel_motorway_casing": "#2E5B4B", "tunnel_motorway_inner": "#163E31",
+  "aeroway-taxiway": "#2E5B4B", "aeroway-runway-casing": "#2E5B4B",
+  "aeroway-area": "#1F4A3B", "aeroway-runway": "#1F4A3B",
+  "road_area_pier": "#163E31", "road_pier": "#163E31",
+  "railway": "#0A2A20", "railway_dashline": "#2E5B4B",
+  "railway_transit": "#0A2A20", "railway_transit_dashline": "#2E5B4B",
+  "railway_service": "#0A2A20", "railway_service_dashline": "#2E5B4B",
+  "boundary_state": "rgba(127,169,154,.35)",
+  "boundary_country_z0-4": "#B9D2C7", "boundary_country_z5-": "#B9D2C7"
+};
+
+/* Fiord label layer id → [text, halo]. Towns in the muted text colour, cities in white. */
+const HALO = "rgba(10,42,32,.8)";
+const NIGHT_LABELS = {
+  "water_name": ["#6FA3B3", "#0A2B33"], "highway_name_other": ["#7FA99A", "#163E31"],
+  "highway_ref": ["#B9D2C7", "#0E3B2E"], "place_other": ["#B9D2C7", HALO],
+  "place_suburb": ["#7FA99A", HALO], "place_village": ["#9DBFB2", HALO],
+  "place_town": ["#DCEAE3", HALO], "place_city": ["#FFFFFF", HALO],
+  "place_city_large": ["#FFFFFF", HALO], "place_state": ["#6F988A", HALO],
+  "place_country_other": ["#B9D2C7", HALO], "place_country_minor": ["#B9D2C7", HALO],
+  "place_country_major": ["#B9D2C7", HALO], "place_continent": ["#FFFFFF", HALO]
+};
+
+let nightStyle = null;
+
+/* Fetched and repainted once per page; both trips share it. If OpenFreeMap's style can't
+   be read, plain Fiord still beats no map. */
+function nightBasemap() {
+  return nightStyle || (nightStyle = fetch(FIORD)
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(style => {
+      style.layers.forEach(layer => {
+        const paint = layer.paint || (layer.paint = {});
+        const fill = NIGHT_FILLS[layer.id], label = NIGHT_LABELS[layer.id];
+        if (fill) ["background-color", "fill-color", "line-color"]
+          .forEach(key => { if (key in paint) paint[key] = fill; });
+        if (label) { paint["text-color"] = label[0]; paint["text-halo-color"] = label[1]; }
+      });
+      return style;
+    })
+    .catch(() => FIORD));
+}
+
+/* A URL or a style object, whichever MapLibre's setStyle should get. Each map gets its
+   own copy of the night style, so two maps never share one object. */
+const basemapStyle = t => t === "light"
+  ? Promise.resolve(LIBERTY)
+  : nightBasemap().then(s => typeof s === "string" ? s : structuredClone(s));
+
+/* The route is always navigation blue, the way Google Maps draws one; the theme's accent
+   belongs to the button that opens it. No road, forest or water shares the blue on either
+   map (~5:1 on both). The edge is the page colour, drawn wider underneath so the route
+   stays readable where it crosses roads. */
 const PALETTE = {
-  light: { track:"#B23A2E", stroke:"#3D3020", fill:"#FDFBF4" },
-  dark:  { track:"#E2553F", stroke:"#E8E2D4", fill:"#16211C" }
+  light: { route:"#0172AD", edge:"#FDFBF4", track:"#B23A2E", stroke:"#3D3020", fill:"#FDFBF4" },
+  dark:  { route:"#4DB2FF", edge:"#0A2A20", track:"#E2553F", stroke:"#E8E2D4", fill:"#16211C" }
 };
 
 const $  = (root, sel) => (typeof root === "string" ? document : root).querySelector(typeof root === "string" ? root : sel);
@@ -317,16 +468,21 @@ function mapsLink(stops, here) {
   return "https://www.google.com/maps/dir/?" + q.toString();
 }
 
-/* Android hands straight to the Maps app; elsewhere the https link is a universal link. */
+/* Android hands straight to the Maps app; elsewhere Maps gets a new tab and this page
+   stays put. No "noopener" feature: with it window.open always returns null, which
+   can't be told apart from a blocked popup, so the opener is cut by hand instead.
+   Returns false when the browser blocked the tab — that happens when the location
+   prompt outlives the tap. */
 function openMaps(url) {
   if (/Android/i.test(navigator.userAgent || "")) {
     window.location.href = "intent://" + url.replace(/^https:\/\//, "") +
       "#Intent;scheme=https;package=com.google.android.apps.maps" +
       ";S.browser_fallback_url=" + encodeURIComponent(url) + ";end";
-    return;
+    return true;
   }
-  const win = window.open(url, "_blank", "noopener");
-  if (!win) window.location.href = url;
+  const win = window.open(url, "_blank");
+  if (win) win.opener = null;
+  return Boolean(win);
 }
 
 function locate() {
@@ -374,30 +530,57 @@ function buildRoute(article) {
 
   openButton.href = mapsLink(stops, null);
 
-  const map = L.map($(article, ".map"), { scrollWheelZoom: false });
+  const map = L.map($(article, ".map"), { scrollWheelZoom: false, maxZoom: 18 });
 
-  const tiles = {
-    light: L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }),
-    dark: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
-      maxZoom: 16, attribution: 'Esri, HERE, Garmin, © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' })
-  };
+  /* The map's height follows the stop list, which changes when the web fonts land.
+     Leaflet only notices window resizes on its own. */
+  new ResizeObserver(() => map.invalidateSize()).observe(map.getContainer());
+
+  /* One MapLibre layer per map; a theme change swaps its style instead of stacking a
+     second WebGL map. Attribution comes from the style's own tile source. The layer only
+     builds its MapLibre map once Leaflet has a view, so a theme flip before the route
+     lands replaces the layer rather than restyling a map that doesn't exist yet. */
+  let basemap = null, basemapTheme = null;
+
+  function dressBasemap(t) {
+    if (t === basemapTheme) return;
+    basemapTheme = t;
+    basemapStyle(t).then(style => {
+      if (t !== basemapTheme) return; // the theme flipped again while this loaded
+      const gl = basemap && basemap.getMaplibreMap();
+      if (gl) return gl.setStyle(style);
+      if (basemap) basemap.remove();
+      basemap = L.maplibreGL({ style }).addTo(map);
+    });
+  }
 
   const markers = stops.map(s =>
     L.circleMarker([s.lat, s.lon], { radius: 6, weight: 2, fillOpacity: 1 })
       .addTo(map).bindPopup(`<b>${s.name}</b>`));
 
-  let line = null, hereMarker = null, known = null;
+  let line = null, edge = null, hereMarker = null, known = null;
 
   function dressMap() {
     const t = theme(), c = PALETTE[t];
-    Object.keys(tiles).forEach(k => {
-      if (k === t) { if (!map.hasLayer(tiles[k])) tiles[k].addTo(map); }
-      else if (map.hasLayer(tiles[k])) map.removeLayer(tiles[k]);
-    });
+    dressBasemap(t);
     markers.forEach(m => m.setStyle({ color: c.stroke, fillColor: c.fill }));
-    if (line) line.setStyle({ color: c.track });
+    if (line) { line.setStyle({ color: c.route }); edge.setStyle({ color: c.edge }); }
     if (hereMarker) hereMarker.setStyle({ color: c.track, fillColor: c.track });
+  }
+
+  /* The route sits on a wider line in the page colour, so it stays readable where it
+     crosses roads; the markers go back on top of both. Fitting first matters: Leaflet
+     holds back every layer until the map has a view, and a held-back marker can't be
+     brought to the front. */
+  function setLine(latlngs, style) {
+    if (line) { line.remove(); edge.remove(); }
+    map.fitBounds(L.latLngBounds(latlngs), { padding: [24, 24] });
+    const c = PALETTE[theme()];
+    edge = L.polyline(latlngs, Object.assign({}, style,
+      { color: c.edge, weight: style.weight + 4, opacity: 1 })).addTo(map);
+    line = L.polyline(latlngs, Object.assign({}, style, { color: c.route })).addTo(map);
+    markers.forEach(m => m.bringToFront());
+    if (hereMarker) hereMarker.bringToFront();
   }
   dressMap();
   document.addEventListener("theme", dressMap);
@@ -415,9 +598,7 @@ function buildRoute(article) {
         const r = data.routes[0];
         const shape = r.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
 
-        if (line) line.remove();
-        line = L.polyline(shape, { color: PALETTE[theme()].track, weight: 4, opacity: .95 }).addTo(map);
-        map.fitBounds(line.getBounds(), { padding: [24, 24] });
+        setLine(shape, { weight: 4, opacity: 1 });
 
         const km = Math.round(r.distance / 1000);
         const hours = Math.floor(r.duration / 3600);
@@ -431,10 +612,7 @@ function buildRoute(article) {
         gpxButton.onclick = () => downloadGpx(slug, name, points, shape);
       })
       .catch(() => {
-        if (line) line.remove();
-        line = L.polyline(points.map(p => [p.lat, p.lon]),
-          { color: PALETTE[theme()].track, weight: 2, opacity: .7, dashArray: "5 7" }).addTo(map);
-        map.fitBounds(line.getBounds(), { padding: [24, 24] });
+        setLine(points.map(p => [p.lat, p.lon]), { weight: 2, opacity: .85, dashArray: "5 7" });
         distanceEl.className = "stat failed";
         distanceEl.innerHTML = '<i data-lucide="triangle-alert"></i>router unavailable';
         durationEl.hidden = true;
@@ -444,7 +622,14 @@ function buildRoute(article) {
 
   drawRoute(stops);
 
-  /* One tap: find you, close the loop, hand off to Maps. */
+  function handOff() {
+    if (openMaps(openButton.href)) return;
+    noticeEl.textContent = (noticeEl.textContent +
+      " The browser blocked the new tab — tap the button again.").trim();
+  }
+
+  /* One tap: find you, close the loop, hand off to Maps. Once you're found the button
+     is a plain link with target="_blank", so later taps skip all of this. */
   openButton.addEventListener("click", event => {
     if (known) return;
     event.preventDefault();
@@ -465,7 +650,7 @@ function buildRoute(article) {
         openButton.innerHTML = label;
         openButton.href = mapsLink(stops, here);
         drawRoute([here, ...stops, here]);
-        openMaps(openButton.href);
+        handOff();
       })
       .catch(err => {
         openButton.removeAttribute("aria-busy");
@@ -473,7 +658,7 @@ function buildRoute(article) {
         noticeEl.textContent = err && err.code === 1
           ? "Without your location the route starts from the device and ends at the last stop."
           : "Couldn't get your location. Opening the simple version.";
-        openMaps(openButton.href);
+        handOff();
       });
   });
 }
