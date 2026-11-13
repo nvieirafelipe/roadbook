@@ -164,6 +164,13 @@ ol.stops::before { content: ""; position: absolute; left: 75.5px; top: 10px; bot
 .card .name { font-family: var(--narrow); font-weight: 700; font-size: 19px; line-height: 1.15; }
 .card .sub { color: var(--muted); font-size: 15px; }
 .card .plan { font-size: 15px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+/* Collapsed plan B: a single line; a tap opens the whole card with the note and the buttons */
+.stop.alt:not(.selected) { padding: 2px 0; }
+.stop.alt:not(.selected) .card { padding: 4px 10px; background: transparent; border-style: dashed; }
+.stop.alt:not(.selected) .card .name { font-family: var(--serif); font-size: 15px; font-weight: 400; color: var(--muted); }
+.stop.alt:not(.selected) .card .sub, .stop.alt:not(.selected) .card .plan { display: none; }
+.stop.alt:not(.selected) .time { font-size: 14px; font-weight: 500; color: var(--muted); padding-top: 4px; }
+.stop.alt.selected .alt-tag { display: none; }
 .details { display: none; margin-top: 10px; }
 .stop.selected .details { display: block; }
 .details p { margin: 0 0 8px; font-size: 16px; }
@@ -610,7 +617,7 @@ function renderDays() {
       const li = document.createElement("li");
       li.id = "stop-" + s.id;
       const isLate = overdue(day).some((x) => x.s.id === s.id);
-      li.className = "stop " + s.kind + (done.has(s.id) ? " done" : "") + (isLate ? " late" : "") + (n && n.id === s.id ? " next" : "") + (selected === s.id ? " selected" : "");
+      li.className = "stop " + s.kind + (s.alt ? " alt" : "") + (done.has(s.id) ? " done" : "") + (isLate ? " late" : "") + (n && n.id === s.id ? " next" : "") + (selected === s.id ? " selected" : "");
       const t = a !== null ? a : d;
       const plan = [a !== null ? "Chegar " + showTime(a) : "", d !== null ? "Sair " + showTime(d) : ""].filter(Boolean).join(", ");
       const ck = checkMin(s);
@@ -618,7 +625,7 @@ function renderDays() {
       li.innerHTML =
         '<div class="time">' + fmtMin(t) + (t >= 1440 ? "<small>dia seguinte</small>" : "") + '</div>' + (STOP_NUMBER[s.id] ? '<div class="dot num" aria-hidden="true">' + STOP_NUMBER[s.id] + '</div>' : '<div class="dot"></div>') +
         '<div><button class="card" type="button" aria-expanded="' + (selected === s.id) + '">' +
-          '<div class="name">' + esc(s.name) + '</div><div class="sub">' + esc(s.sub) + '</div>' +
+          '<div class="name">' + (s.alt ? '<span class="alt-tag">Plano B: </span>' : "") + esc(s.name) + '</div><div class="sub">' + esc(s.sub) + '</div>' +
           '<div class="plan">' + plan + '</div></button>' +
           '<div class="details">' +
             (s.note ? '<p>' + esc(s.note) + '</p>' : "") +
