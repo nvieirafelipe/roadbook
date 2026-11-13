@@ -262,18 +262,18 @@ footer a { color: inherit; }
       </summary>
       <div class="setup">
         <label>Dia da saída
-          <input type="date" id="p-data">
+          <input type="date" id="p-date">
         </label>
         <fieldset>
           <legend>Dia 1</legend>
-          <label>Saída <input type="time" id="p-saida1"></label>
-          <label>Chegar até <input type="time" id="p-chegada1" aria-describedby="msg1"></label>
+          <label>Saída <input type="time" id="p-depart1"></label>
+          <label>Chegar até <input type="time" id="p-arrive1" aria-describedby="msg1"></label>
           <p class="field-msg" id="msg1" aria-live="polite"></p>
         </fieldset>
         <fieldset>
           <legend>Dia 2</legend>
-          <label>Saída <input type="time" id="p-saida2"></label>
-          <label>Chegar até <input type="time" id="p-chegada2" aria-describedby="msg2"></label>
+          <label>Saída <input type="time" id="p-depart2"></label>
+          <label>Chegar até <input type="time" id="p-arrive2" aria-describedby="msg2"></label>
           <p class="field-msg" id="msg2" aria-live="polite"></p>
         </fieldset>
         <div class="setup-actions">
@@ -317,14 +317,14 @@ footer a { color: inherit; }
 /* Times from the original plan, leaving at 00:00 on day 1 and at 06:30 on day 2.
    Changing the departure shifts everything along with it. */
 const BASE = { 1: "00:00", 2: "06:30" };
-const DEFAULTS = { data: "", saida1: "00:00", chegada1: "18:00", saida2: "06:30", chegada2: "17:00" };
+const DEFAULTS = { date: "", depart1: "00:00", arrive1: "18:00", depart2: "06:30", arrive2: "17:00" };
 
 /* alt: backup fuel stop, before and after each chosen station. It never becomes the next stop,
    raises no overdue warning and has no mark-as-done button. Towns and stations come from
    OpenStreetMap (queried on 2026-11-13), with the point on a station less than 100 m from the
    route; the time is interpolated by distance between the neighbouring stops of the plan. */
 const STOPS = [
-  { id: "inicio", day: 1, kind: "start", name: "Campinas", sub: "Saída", lat: -22.9056, lng: -47.0608, depart: "00:00",
+  { id: "start", day: 1, kind: "start", name: "Campinas", sub: "Saída", lat: -22.9056, lng: -47.0608, depart: "00:00",
     note: "Tanque cheio desde a véspera." },
   { id: "perdoes", day: 1, kind: "pass", alt: true, name: "Perdões", sub: "Plano B de combustível", lat: -21.108312, lng: -45.092526,
     arrive: "03:50", note: "Antes de Oliveira: 8 postos na Fernão Dias. O do mapa aparece como 24 h no OpenStreetMap." },
@@ -348,7 +348,7 @@ const STOPS = [
     check: { by: "16:00", text: "Passando depois das 16h, a chegada a Itaobim fica para depois das 18h." } },
   { id: "itaobim", day: 1, kind: "fuel", name: "Posto Transanimais (Petrobras)", sub: "Itaobim, BR-116 · 24h", lat: -16.6206428, lng: -41.5022667,
     arrive: "15:45", depart: "16:00", roads: ["BR 367"], note: "Abasteçam na chegada para sair cedo sem parar. O centro de Itaobim fica uns 7 km adiante pela BR-116." },
-  { id: "pernoite", day: 1, kind: "sleep", name: "Itaobim", sub: "Pernoite", lat: -16.561859, lng: -41.5024806,
+  { id: "overnight", day: 1, kind: "sleep", name: "Itaobim", sub: "Pernoite", lat: -16.561859, lng: -41.5024806,
     query: "Itaobim, MG", arrive: "16:10", roads: ["BR 116"] }, /* by name, Google does not show a street address */
 
   { id: "itaobim2", day: 2, kind: "start", name: "Itaobim", sub: "Saída do dia 2", lat: -16.561859, lng: -41.5024806, depart: "06:30",
@@ -381,7 +381,7 @@ STOPS.filter((s) => s.hidePin).forEach((s) => {
   if (twin) STOP_NUMBER[s.id] = STOP_NUMBER[twin.id];
 });
 const VIA = { curvelo: [[-44.2468, -19.4658]], virgem: [[-42.694, -17.081]] };
-const LAST = { 1: "pernoite", 2: "algodoes" };
+const LAST = { 1: "overnight", 2: "algodoes" };
 /* Driving time only, in minutes. Day 1: Google Maps range (15h10 to 19h10).
    Day 2: no range, uses the estimated plan. */
 /* Whole-day route in Google Maps (up to 9 waypoints). Only mandatory stops go in: each point
@@ -390,24 +390,27 @@ const LAST = { 1: "pernoite", 2: "algodoes" };
    Ijicatu) to Virgem da Lapa and on BR-367 through Araçuaí (checked on 2026-11-13). The day
    ends in the centre of Itaobim, after the fuel station. */
 const DAY_ROUTE = {
-  1: ["oliveira", "diamantina", "itaobim", "pernoite"],
+  1: ["oliveira", "diamantina", "itaobim", "overnight"],
   2: ["jequie", "ubaitaba", "algodoes"]
 };
 const DRIVE = { 1: { min: 15 * 60 + 10, max: 19 * 60 + 10, source: "Google Maps" } };
 
 /* Parameters: URL first, then what was saved, then the default.
-   E.g.: ?data=2026-12-19&saida1=00:00&chegada1=18:00&saida2=06:30&chegada2=17:00 */
+   E.g.: ?date=2026-12-19&depart1=00:00&arrive1=18:00&depart2=06:30&arrive2=17:00 */
 const store = {
-  get(k) { try { return localStorage.getItem("copiloto-marau:" + k); } catch (e) { return null; } },
-  set(k, v) { try { localStorage.setItem("copiloto-marau:" + k, v); } catch (e) {} }
+  get(k) { try { return localStorage.getItem("marau:" + k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem("marau:" + k, v); } catch (e) {} }
 };
+/* Drops keys left by earlier storage names of this page, like the stale route copy. Matching on
+   "marau" leaves the roadbook's keys (and the shared "theme") alone. */
+try { Object.keys(localStorage).filter((k) => k.includes("marau") && !k.startsWith("marau:")).forEach((k) => localStorage.removeItem(k)); } catch (e) {}
 /* A reload opens at the top: the map is built for its full height */
 try { history.scrollRestoration = "manual"; } catch (e) {}
 const qs = new URLSearchParams(location.search);
 const P = {};
 Object.keys(DEFAULTS).forEach((k) => {
   const fromUrl = qs.get(k);
-  const ok = k === "data" ? /^\d{4}-\d{2}-\d{2}$/ : /^\d{2}:\d{2}$/;
+  const ok = k === "date" ? /^\d{4}-\d{2}-\d{2}$/ : /^\d{2}:\d{2}$/;
   P[k] = fromUrl && ok.test(fromUrl) ? fromUrl : (store.get(k) || DEFAULTS[k]);
 });
 let done = new Set(JSON.parse(store.get("done") || "[]"));
@@ -454,17 +457,17 @@ function planMin(stop, which) {
   if (!stop[which]) return null;
   let rel = toMin(stop[which]) - toMin(BASE[stop.day]);
   if (rel < 0) rel += 1440;
-  return toMin(P["saida" + stop.day]) + rel;
+  return toMin(P["depart" + stop.day]) + rel;
 }
 function checkMin(stop) {
   if (!stop.check) return null;
   if (!stop.check.rel) return toMin(stop.check.by);
   let rel = toMin(stop.check.by) - toMin(BASE[stop.day]);
-  return toMin(P["saida" + stop.day]) + rel;
+  return toMin(P["depart" + stop.day]) + rel;
 }
 function toDate(day, min) {
-  if (!P.data || min === null) return null;
-  const [y, m, d] = P.data.split("-").map(Number);
+  if (!P.date || min === null) return null;
+  const [y, m, d] = P.date.split("-").map(Number);
   return new Date(y, m - 1, d + (day - 1), 0, min);
 }
 function showTime(min) {
@@ -487,14 +490,14 @@ function dayStats(day) {
   return { total: drive + stops, stops, drive, driveMax, worst: driveMax ? driveMax + stops : null, source: d ? d.source : null };
 }
 function limitMin(day) {
-  let lim = toMin(P["chegada" + day]);
-  if (lim <= toMin(P["saida" + day])) lim += 1440; /* arrival before departure = next day */
+  let lim = toMin(P["arrive" + day]);
+  if (lim <= toMin(P["depart" + day])) lim += 1440; /* arrival before departure = next day */
   return lim;
 }
 const hm = (m) => m < 60 ? m + " min" : Math.floor(m / 60) + "h" + (m % 60 ? pad(m % 60) : "");
 function validateDay(day) {
   const st = dayStats(day);
-  const win = limitMin(day) - toMin(P["saida" + day]);
+  const win = limitMin(day) - toMin(P["depart" + day]);
   const issues = [];
   let level = "ok";
   if (win < st.drive) {
@@ -519,7 +522,7 @@ function stopLimit(stop) {
   return stop.check ? checkMin(stop) : planMin(stop, "arrive");
 }
 function overdue(day) {
-  if (!P.data) return [];
+  if (!P.date) return [];
   const now = new Date();
   const dayStart = toDate(day, 0);
   if (now < dayStart || now - dayStart > 36 * 3600000) return [];
@@ -543,19 +546,19 @@ function dayRouteLink(day) {
 function renderSetupSummary() {
   const el = $("#setupSummary");
   const bad = [1, 2].filter((d) => validateDay(d).level === "err");
-  if (!P.data) { el.className = "setup-sum"; el.textContent = "Escolha a data e os horários"; return; }
-  const [y, m, d] = P.data.split("-").map(Number);
+  if (!P.date) { el.className = "setup-sum"; el.textContent = "Escolha a data e os horários"; return; }
+  const [y, m, d] = P.date.split("-").map(Number);
   const when = new Date(y, m - 1, d).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" });
   el.className = "setup-sum" + (bad.length ? " err" : "");
-  el.innerHTML = "<strong>" + esc(when) + "</strong> · Dia 1: " + P.saida1 + " a " + showTime(limitMin(1)) +
-    " · Dia 2: " + P.saida2 + " a " + showTime(limitMin(2)) +
+  el.innerHTML = "<strong>" + esc(when) + "</strong> · Dia 1: " + P.depart1 + " a " + showTime(limitMin(1)) +
+    " · Dia 2: " + P.depart2 + " a " + showTime(limitMin(2)) +
     (bad.length ? " · Horário impossível no dia " + bad.join(" e ") : "");
 }
 function renderValidation() {
   renderSetupSummary();
   [1, 2].forEach((day) => {
     const v = validateDay(day);
-    const input = $("#p-chegada" + day), msg = $("#msg" + day);
+    const input = $("#p-arrive" + day), msg = $("#msg" + day);
     input.setAttribute("aria-invalid", String(v.level === "err"));
     input.setCustomValidity(v.level === "err" ? v.issues[0] : "");
     msg.className = "field-msg " + (v.level === "err" ? "err" : "warn-text");
@@ -576,7 +579,7 @@ function renderPlate() {
   const arrMin = planMin(n, "arrive");
   const arr = toDate(n.day, arrMin);
   let status = "";
-  if (!P.data) status = '<div class="status">Defina o dia da saída para comparar com o plano.</div>';
+  if (!P.date) status = '<div class="status">Defina o dia da saída para comparar com o plano.</div>';
   else if (eta && eta.stopId === n.id && arr) {
     const diff = Math.round((eta.at - arr) / 60000);
     const cls = diff > 10 ? "late" : diff < -10 ? "early" : "";
@@ -609,8 +612,8 @@ function renderDays() {
     const p = document.createElement("p");
     p.className = "day-sub";
     const st = dayStats(day);
-    const worstTxt = st.worst ? " Com trânsito ruim, até " + showTime(toMin(P["saida" + day]) + st.worst) + "." : "";
-    p.textContent = "Saída " + P["saida" + day] + ". Chegada prevista " + showTime(arr) + ", limite " + showTime(lim) + "." + worstTxt;
+    const worstTxt = st.worst ? " Com trânsito ruim, até " + showTime(toMin(P["depart" + day]) + st.worst) + "." : "";
+    p.textContent = "Saída " + P["depart" + day] + ". Chegada prevista " + showTime(arr) + ", limite " + showTime(lim) + "." + worstTxt;
     sec.append(h, p);
     const route = dayRouteLink(day);
     /* Google Maps only: the Waze link takes a single destination, so Waze stays on each stop */
@@ -1064,7 +1067,7 @@ async function refreshEta() {
 }
 
 /* ---------- Offline use ---------- */
-const MAP_CACHE = "copiloto-marau-map";
+const MAP_CACHE = "marau-map";
 const FONTS_CSS = "https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap";
 let downloading = false;
 
@@ -1216,7 +1219,7 @@ Object.keys(DEFAULTS).forEach((k) => {
   const input = $("#p-" + k);
   input.value = P[k];
   input.addEventListener("change", () => {
-    if (!input.value && k !== "data") { input.value = P[k]; return; }
+    if (!input.value && k !== "date") { input.value = P[k]; return; }
     P[k] = input.value;
     store.set(k, P[k]);
     syncUrl(); eta = null; renderAll();
@@ -1229,9 +1232,9 @@ setInterval(() => { refreshEta(); renderAll(); }, 60000);
 
 syncUrl();
 renderAll();
-$("#setupBox").open = !P.data || [1, 2].some((d) => validateDay(d).level === "err");
+$("#setupBox").open = !P.date || [1, 2].some((d) => validateDay(d).level === "err");
 $("#setupDone").addEventListener("click", () => {
-  if (!P.data) { $("#p-data").focus(); return; }
+  if (!P.date) { $("#p-date").focus(); return; }
   $("#setupBox").open = false;
   $("#setupBox summary").focus();
 });

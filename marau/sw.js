@@ -6,9 +6,9 @@
    - MAP: OpenFreeMap style, tiles, labels and icons. No version, so the downloaded map survives
      page updates. */
 
-const VERSION = "v7";
-const SHELL = "copiloto-marau-shell-" + VERSION;
-const MAP = "copiloto-marau-map";
+const VERSION = "v8";
+const SHELL = "marau-shell-" + VERSION;
+const MAP = "marau-map";
 
 const PRECACHE = [
   "./",
@@ -33,9 +33,11 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
+    /* Drops every cache of this page that is not current: older shells and caches left by
+       earlier names. Matching on "marau" keeps the roadbook's caches on this domain untouched. */
     const names = await caches.keys();
     await Promise.all(names
-      .filter((n) => n.startsWith("copiloto-marau-shell-") && n !== SHELL)
+      .filter((n) => n.includes("marau") && n !== SHELL && n !== MAP)
       .map((n) => caches.delete(n)));
     await self.clients.claim();
   })());
