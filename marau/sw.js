@@ -1,17 +1,18 @@
 /* Service worker for the trip page. It lives at /roadbook/marau/sw.js, so it only controls that folder.
 
    Two caches, with names of their own so they do not collide with the roadbook on the same domain:
-   - SHELL: the page, the libraries and the fonts. Its name carries the version; when publishing
-     a change, bump VERSION and the old cache is deleted on activation.
+   - SHELL: the page, the manifest, the icons, the libraries and the fonts. Its name carries the
+     version; when publishing a change, bump VERSION and the old cache is deleted on activation.
    - MAP: OpenFreeMap style, tiles, labels and icons. No version, so the downloaded map survives
      page updates. */
 
-const VERSION = "v5";
+const VERSION = "v6";
 const SHELL = "copiloto-marau-shell-" + VERSION;
 const MAP = "copiloto-marau-map";
 
 const PRECACHE = [
   "./",
+  "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "icon-180.png",
   "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js",
   "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css",
   "https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap"
@@ -75,6 +76,11 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate" && url.href.startsWith(self.registration.scope)) {
     event.respondWith(networkFirst(request, SHELL, 4000));
+    return;
+  }
+  /* The folder's manifest and icons: served from the version cache, so the installed app opens without signal */
+  if (url.href.startsWith(self.registration.scope)) {
+    event.respondWith(cacheFirst(request, SHELL));
     return;
   }
   /* Style, tilejson, tiles, labels and icons: all from the same place and the same version,
