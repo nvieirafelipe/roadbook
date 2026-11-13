@@ -197,6 +197,17 @@ ol.stops::before { content: ""; position: absolute; left: 75.5px; top: 10px; bot
 .btn:disabled { opacity: .6; cursor: progress; }
 footer { border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; margin-top: 32px; padding-top: 12px; }
 
+/* Emergency: fixed in the corner, above the map, also with the map expanded. Opens three calls. */
+.sos { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5; }
+html.map-only .sos { bottom: calc(56px + env(safe-area-inset-bottom, 0px)); } /* above the attribution (i) */
+.sos summary { list-style: none; cursor: pointer; display: grid; place-items: center; width: 56px; height: 56px; background: var(--track); color: #fff; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+.sos summary::-webkit-details-marker { display: none; }
+.sos summary svg { width: 26px; height: 26px; }
+.sos .ico-close, .sos[open] .ico-phone { display: none; }
+.sos[open] .ico-close { display: block; }
+.sos-list { position: absolute; right: 0; bottom: calc(100% + 8px); display: flex; flex-direction: column; gap: 8px; min-width: 210px; }
+.sos-list a { display: flex; justify-content: space-between; gap: 16px; font-family: var(--narrow); font-weight: 700; font-size: 20px; text-decoration: none; background: var(--card); color: var(--ink); border: 2px solid var(--track); border-radius: var(--radius); padding: 12px 16px; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+.sos-list a strong { color: var(--track); font-variant-numeric: tabular-nums; }
 footer a { color: inherit; }
 
 .me-dot { width: 18px; height: 18px; border-radius: 50%; background: var(--track); border: 3px solid var(--card); box-shadow: 0 0 0 6px color-mix(in srgb, var(--track) 30%, transparent); }
@@ -284,6 +295,18 @@ footer a { color: inherit; }
     </footer>
   </div>
 </main>
+
+<details class="sos" id="sos">
+  <summary aria-label="Telefones de emergência" title="Telefones de emergência">
+    <svg class="ico-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+    <svg class="ico-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+  </summary>
+  <div class="sos-list">
+    <a href="tel:191" aria-label="Ligar para a PRF, 191">PRF <strong>191</strong></a>
+    <a href="tel:192" aria-label="Ligar para o SAMU, 192">SAMU <strong>192</strong></a>
+    <a href="tel:193" aria-label="Ligar para os Bombeiros, 193">Bombeiros <strong>193</strong></a>
+  </div>
+</details>
 
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js" crossorigin="anonymous"></script>
 <script>
