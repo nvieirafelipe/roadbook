@@ -6,7 +6,7 @@
    - MAP: OpenFreeMap style, tiles, labels and icons. No version, so the downloaded map survives
      page updates. */
 
-const VERSION = "v3";
+const VERSION = "v4";
 const SHELL = "copiloto-marau-shell-" + VERSION;
 const MAP = "copiloto-marau-map";
 

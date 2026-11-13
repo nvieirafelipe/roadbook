@@ -47,6 +47,7 @@
    and show its address bar in a loop and leave an empty strip at the bottom. */
 html, body { margin: 0; }
 html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+html.map-only { overflow: hidden; } /* full-screen map: the list underneath must not scroll */
 body {
   background: var(--bg); color: var(--ink);
   font-family: var(--serif); font-size: 17px; line-height: 1.5;
@@ -63,6 +64,12 @@ a { color: var(--primary); }
 #map.collapsed .map-tools, #map.collapsed .map-note { opacity: 0; visibility: hidden; }
 .map-note { position: absolute; top: 56px; left: 10px; right: 10px; z-index: 10; margin: 0; padding: 6px 10px; font-size: 14px; background: var(--card); color: var(--ink); border: 1px solid var(--rule); border-left: 4px solid var(--track); border-radius: var(--radius); }
 .map-note[hidden] { display: none; }
+/* Expand map: the map fills the screen; the same button, in the bottom corner, goes back to the list.
+   It stays visible when the map is shrunk too. */
+.map-expand { position: absolute; left: 10px; bottom: 10px; z-index: 10; font-family: var(--narrow); font-weight: 700; font-size: 15px; background: var(--card); color: var(--ink); border: 1px solid var(--rule); border-radius: var(--radius); padding: 7px 12px; cursor: pointer; }
+.map-expand[aria-pressed="true"] { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
+html.map-only #map { height: auto; bottom: env(safe-area-inset-bottom, 0px); }
+html.map-only #map .map-tools, html.map-only #map .map-note { opacity: 1; visibility: visible; }
 .map-tools button {
   font-weight: 700; font-size: 15px;
   background: var(--card); color: var(--ink); border: 1px solid var(--rule);
@@ -214,6 +221,7 @@ footer a { color: inherit; }
     <button id="fitBtn">Ver viagem</button>
   </div>
   <p class="map-note" id="mapNote" role="status" hidden></p>
+  <button type="button" class="map-expand" id="expandBtn" aria-pressed="false">Expandir mapa</button>
 </div>
 <main>
   <div class="wrap">
@@ -681,8 +689,8 @@ let map = null;
 const pins = {};
 let meMarker = null;
 const BOUNDS = [[-47.3, -23.1], [-38.7, -13.6]];
-/* Padding so the buttons at the top and the (i) at the bottom do not cover edge pins */
-const FIT = { padding: { top: 64, bottom: 48, left: 30, right: 30 } };
+/* Padding so the top buttons and the bottom expand button and (i) do not cover edge pins */
+const FIT = { padding: { top: 64, bottom: 68, left: 30, right: 30 } };
 function mapFailed() {
   map = null;
   const m = document.createElement("div");
@@ -763,6 +771,7 @@ async function initMap() {
       attributionControl: { compact: true }
     });
   } catch (e) { mapFailed(); return; }
+  map.once("load", collapseAttribution); /* MapLibre only opens the attribution once the style arrives */
   /* Dragging the map turns Follow off */
   map.on("dragstart", () => setFollow(false));
   map.on("style.load", addRouteLayers); /* changing the theme swaps the style and drops the layers */
@@ -908,7 +917,7 @@ function startGeo() {
    does not follow the scroll: it only moves on a tap on a stop (in the list or on the map) or
    on the map buttons. */
 const MAP_MIN = 128; /* px: still shows the stop pin and a bit of its surroundings */
-const mapEl = document.getElementById("map");
+const mainEl = document.querySelector("main"), mapEl = document.getElementById("map");
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 let mapFull = 0, collapsed = false, syncQueued = false;
 
@@ -927,8 +936,8 @@ function queueSync() {
   syncQueued = true;
   requestAnimationFrame(syncMap);
 }
-/* Collapses the attribution into the (i) button, as MapLibre does on drag. Open, it covers much
-   of the shrunk map; the (i) still opens the text. */
+/* Collapses the attribution into the (i) button, as MapLibre does on drag. Open, it covers the
+   expand button in the bottom corner and much of the shrunk map; the (i) still opens the text. */
 function collapseAttribution() {
   const attrib = mapEl.querySelector(".maplibregl-ctrl-attrib.maplibregl-compact");
   if (attrib) { attrib.classList.remove("maplibregl-compact-show"); attrib.removeAttribute("open"); }
@@ -958,6 +967,29 @@ measureMapFull();
 addEventListener("scroll", queueSync, { passive: true });
 addEventListener("resize", () => { measureMapFull(); queueSync(); });
 $("#setupBox").addEventListener("toggle", queueSync);
+
+/* ---------- Expand map ----------
+   The map fills the screen and the list underneath is inert. Follow and View trip work as at
+   the top. The phone's back button also leaves the mode, so entering it adds a history step. */
+let mapOnly = false;
+function setMapOnly(on, fromHistory) {
+  if (mapOnly === on) return;
+  mapOnly = on;
+  document.documentElement.classList.toggle("map-only", on);
+  mainEl.inert = on;
+  const b = $("#expandBtn");
+  b.textContent = on ? "Voltar à lista" : "Expandir mapa";
+  b.setAttribute("aria-pressed", String(on));
+  if (!fromHistory) {
+    try {
+      if (on) history.pushState({ mapOnly: true }, "");
+      else if (history.state && history.state.mapOnly) history.back();
+    } catch (e) {}
+  }
+  if (!on) queueSync();
+}
+$("#expandBtn").addEventListener("click", () => setMapOnly(!mapOnly));
+addEventListener("popstate", () => setMapOnly(!!(history.state && history.state.mapOnly), true));
 
 /* Average speed the plan assumes on the leg to the next stop */
 function plannedSpeed(n) {
