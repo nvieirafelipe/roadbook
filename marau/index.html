@@ -36,6 +36,8 @@
   /* Full and current map height; the script replaces both with px values */
   --map-full: max(240px, 42vh);
   --map-h: var(--map-full);
+  /* Stop numbers: the same on the map and in the list, in both themes: road-sign yellow */
+  --sign: #F5C518; --sign-ink: #1E1B12;
   box-sizing: border-box;
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -56,10 +58,10 @@ a { color: var(--primary); }
 #map { position: fixed; top: env(safe-area-inset-top, 0px); left: 0; right: 0; z-index: 3; height: var(--map-h); background: var(--map-bg); border-bottom: 1px solid var(--line); }
 .map-msg { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); }
 /* At the top: at the bottom, the map attribution opens over the buttons */
-.map-tools { position: absolute; right: 10px; top: 10px; display: flex; gap: 8px; z-index: 2; transition: opacity .2s, visibility .2s; }
+.map-tools { position: absolute; right: 10px; top: 10px; display: flex; gap: 8px; z-index: 10; transition: opacity .2s, visibility .2s; }
 /* Shrunk map: the buttons hide so they do not cover the small map, and come back with the full map */
 #map.collapsed .map-tools, #map.collapsed .map-note { opacity: 0; visibility: hidden; }
-.map-note { position: absolute; top: 56px; left: 10px; right: 10px; z-index: 2; margin: 0; padding: 6px 10px; font-size: 14px; background: var(--card); color: var(--ink); border: 1px solid var(--rule); border-left: 4px solid var(--track); border-radius: var(--radius); }
+.map-note { position: absolute; top: 56px; left: 10px; right: 10px; z-index: 10; margin: 0; padding: 6px 10px; font-size: 14px; background: var(--card); color: var(--ink); border: 1px solid var(--rule); border-left: 4px solid var(--track); border-radius: var(--radius); }
 .map-note[hidden] { display: none; }
 .map-tools button {
   font-weight: 700; font-size: 15px;
@@ -142,8 +144,9 @@ h2 { font-size: 26px; font-weight: 700; margin: 28px 0 2px; }
 .day-sub { color: var(--muted); margin: 0 0 8px; font-size: 15px; font-variant-numeric: tabular-nums; }
 
 ol.stops { list-style: none; margin: 0; padding: 0; position: relative; }
-ol.stops::before { content: ""; position: absolute; left: 63px; top: 10px; bottom: 10px; width: 1px; background: var(--rule); opacity: .45; }
-.stop { position: relative; display: grid; grid-template-columns: 54px 22px 1fr; gap: 0 8px; padding: 8px 0; }
+/* The line runs through the centre of the dot column: 54 + 8 + 28 / 2 */
+ol.stops::before { content: ""; position: absolute; left: 75.5px; top: 10px; bottom: 10px; width: 1px; background: var(--rule); opacity: .45; }
+.stop { position: relative; display: grid; grid-template-columns: 54px 28px 1fr; gap: 0 8px; padding: 8px 0; }
 .stop .time { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 17px; text-align: right; padding-top: 2px; }
 .stop .time small { display: block; font-weight: 500; font-size: 12px; color: var(--muted); }
 .stop .dot { width: 16px; height: 16px; border-radius: 50%; margin: 6px auto 0; background: var(--card); border: 1px solid var(--rule); position: relative; z-index: 1; }
@@ -151,6 +154,9 @@ ol.stops::before { content: ""; position: absolute; left: 63px; top: 10px; botto
 .stop.pass .dot { width: 11px; height: 11px; margin-top: 8px; border-style: dotted; }
 .stop.done .dot { background: var(--line); border-color: var(--line); }
 .stop.next .dot { box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 35%, transparent); }
+/* Numbered stops: the same yellow badge as the map pin */
+.stop .dot.num { width: 26px; height: 26px; margin-top: 0; display: grid; place-items: center; background: var(--sign); color: var(--sign-ink); border: 2px solid var(--sign-ink); font-family: var(--narrow); font-weight: 700; font-size: 14px; line-height: 1; }
+.stop.done .dot.num { background: var(--card-alt); color: var(--muted); border: 1px dashed var(--rule); }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%; }
 .stop.done .card { opacity: .55; }
 .stop.late .card { border-left: 4px solid var(--track); }
@@ -164,7 +170,7 @@ ol.stops::before { content: ""; position: absolute; left: 63px; top: 10px; botto
 .details .check { border-left: 3px solid var(--rule); padding: 2px 0 2px 10px; color: var(--muted); }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 
-.roads { display: flex; gap: 6px; margin: 2px 0 2px 84px; flex-wrap: wrap; }
+.roads { display: flex; gap: 6px; margin: 2px 0 2px 90px; flex-wrap: wrap; }
 .shield { font-family: var(--narrow); font-size: 13px; font-weight: 700; line-height: 1; background: #fff; color: #111; border: 2px solid #111; border-radius: 4px 4px 9px 9px; padding: 4px 6px 3px; }
 .shield.state { border-radius: 4px; }
 
@@ -180,9 +186,15 @@ footer { border-top: 1px solid var(--line); color: var(--muted); font-size: 14px
 footer a { color: inherit; }
 
 .me-dot { width: 18px; height: 18px; border-radius: 50%; background: var(--track); border: 3px solid var(--card); box-shadow: 0 0 0 6px color-mix(in srgb, var(--track) 30%, transparent); }
-.pin { width: 27px; height: 27px; border-radius: 50%; background: var(--card); color: var(--ink); border: 1px solid var(--rule); font-family: var(--narrow); font-weight: 700; font-size: 14px; display: grid; place-items: center; cursor: pointer; padding: 0; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
-.pin.pass { width: 13px; height: 13px; border-style: dotted; font-size: 0; }
-.pin.done { background: var(--card-alt); color: var(--muted); border-style: dashed; }
+.pin { width: 27px; height: 27px; border-radius: 50%; background: var(--sign); color: var(--sign-ink); border: 2px solid var(--sign-ink); font-family: var(--narrow); font-weight: 700; font-size: 14px; display: grid; place-items: center; cursor: pointer; padding: 0; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.pin.pass { width: 13px; height: 13px; background: var(--card); border: 1px dotted var(--rule); font-size: 0; }
+/* Stacking, top to bottom: your position, numbered stops, pass-through points and plan Bs.
+   The map buttons and the attribution sit above all of them (z-index 10). */
+.pin { z-index: 2; }
+.pin.pass { z-index: 1; }
+.me-dot { z-index: 3; }
+#map .maplibregl-ctrl-bottom-right { z-index: 10; }
+.pin.done { background: var(--card-alt); color: var(--muted); border: 1px dashed var(--rule); }
 .maplibregl-ctrl-attrib { font-family: var(--serif); }
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { * { transition-duration: .01ms !important; } }
@@ -318,6 +330,14 @@ const STOPS = [
     query: "Praia de Algodões, Maraú, BA", arrive: "16:15", roads: ["BR 030"],
     note: "Os últimos quilômetros são de terra: devagar e com luz. A posição no mapa é aproximada; a rota usa o nome da praia." }
 ];
+/* Number of each stop on the map, repeated in the list. The day 2 start has no pin of its own
+   and uses the number of the pin at the same place, the overnight stop. */
+const STOP_NUMBER = {};
+STOPS.filter((s) => !s.hidePin && s.kind !== "pass").forEach((s, i) => { STOP_NUMBER[s.id] = i + 1; });
+STOPS.filter((s) => s.hidePin).forEach((s) => {
+  const twin = STOPS.find((t) => STOP_NUMBER[t.id] && t.lat === s.lat && t.lng === s.lng);
+  if (twin) STOP_NUMBER[s.id] = STOP_NUMBER[twin.id];
+});
 const VIA = { curvelo: [[-44.2468, -19.4658]], virgem: [[-42.694, -17.081]] };
 const LAST = { 1: "pernoite", 2: "algodoes" };
 /* Driving time only, in minutes. Day 1: Google Maps range (15h10 to 19h10).
@@ -596,7 +616,7 @@ function renderDays() {
       const ck = checkMin(s);
       const links = navLinks(s);
       li.innerHTML =
-        '<div class="time">' + fmtMin(t) + (t >= 1440 ? "<small>dia seguinte</small>" : "") + '</div><div class="dot"></div>' +
+        '<div class="time">' + fmtMin(t) + (t >= 1440 ? "<small>dia seguinte</small>" : "") + '</div>' + (STOP_NUMBER[s.id] ? '<div class="dot num" aria-hidden="true">' + STOP_NUMBER[s.id] + '</div>' : '<div class="dot"></div>') +
         '<div><button class="card" type="button" aria-expanded="' + (selected === s.id) + '">' +
           '<div class="name">' + esc(s.name) + '</div><div class="sub">' + esc(s.sub) + '</div>' +
           '<div class="plan">' + plan + '</div></button>' +
@@ -742,16 +762,15 @@ async function initMap() {
   document.addEventListener("theme", () => {
     basemapStyle(theme()).then((st) => map && map.setStyle(st, { diff: false }));
   });
-  let n = 0;
   STOPS.forEach((s) => {
     if (s.hidePin) return;
     const el = document.createElement("button");
     el.type = "button";
     el.className = "pin" + (s.kind === "pass" ? " pass" : "");
     el.addEventListener("click", (e) => { e.stopPropagation(); select(s.id, false); });
-    if (s.kind !== "pass") el.textContent = ++n;
+    if (STOP_NUMBER[s.id]) el.textContent = STOP_NUMBER[s.id];
     const marker = new maplibregl.Marker({ element: el }).setLngLat([s.lng, s.lat]).addTo(map);
-    el.setAttribute("aria-label", s.name); /* after addTo, which replaces the label with "Map marker" */
+    el.setAttribute("aria-label", (STOP_NUMBER[s.id] ? STOP_NUMBER[s.id] + ". " : "") + s.name); /* after addTo, which replaces the label with "Map marker" */
     pins[s.id] = { el, marker };
   });
   updatePins();
