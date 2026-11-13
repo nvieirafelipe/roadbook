@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Campinas a Algodões</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚗</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" crossorigin="anonymous">
+<style>
+/* Same palette as the roadbook: topographic sheet by day, highway sign by night. */
+:root[data-theme="light"] {
+  --bg: #F6F1E4; --ink: #3D3020; --muted: #6B5A42; --line: #CDBC9B;
+  --card: #FDFBF4; --card-alt: #F1EAD9;
+  --primary: #2F6B4F; --primary-hover: #26583F; --primary-ink: #FDFBF4;
+  --rule: #8A6A3B; --track: #B23A2E; --map-bg: #F8F4F0; --switch-bg: #E9E1CE;
+  --plate: #2F6B4F; --plate-ink: #FDFBF4; --plate-line: rgba(253,251,244,.85);
+  --plate-muted: rgba(253,251,244,.8); --plate-late: #FFD3CB; --plate-early: #D6EEDF;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #0A2A20; --ink: #FFFFFF; --muted: #B9D2C7; --line: #2E5B4B;
+  --card: #0E3B2E; --card-alt: #0C3327;
+  --primary: #F5C518; --primary-hover: #FFD64A; --primary-ink: #0E3B2E;
+  --rule: #7FA99A; --track: #E2553F; --map-bg: #163E31; --switch-bg: #1C4A3B;
+  --plate: #0E3B2E; --plate-ink: #FFFFFF; --plate-line: #F5C518;
+  --plate-muted: #B9D2C7; --plate-late: #FF9A85; --plate-early: #B9D2C7;
+  color-scheme: dark;
+}
+:root {
+  --radius: 3px;
+  --serif: "Source Serif 4", Georgia, serif;
+  --narrow: "Archivo Narrow", Haettenschweiler, "Arial Narrow", sans-serif;
+  /* Full and current map height; the script replaces both with px values */
+  --map-full: max(240px, 42vh);
+  --map-h: var(--map-full);
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+*, *::before, *::after { box-sizing: inherit; }
+/* The document scrolls, not an inner box: a full-screen scrolling <main> made mobile Chrome hide
+   and show its address bar in a loop and leave an empty strip at the bottom. */
+html, body { margin: 0; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--serif); font-size: 17px; line-height: 1.5;
+}
+h1, h2, .time, .btn, .actions a, .actions button, .map-tools button, .plate, .setup legend { font-family: var(--narrow); }
+a { color: var(--primary); }
+
+/* Fixed layer at the top: the page scrolls underneath and the height follows the scroll (syncMap) */
+#map { position: fixed; top: env(safe-area-inset-top, 0px); left: 0; right: 0; z-index: 3; height: var(--map-h); background: var(--map-bg); border-bottom: 1px solid var(--line); }
+.map-msg { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); }
+/* At the top: at the bottom, the map attribution opens over the buttons */
+.map-tools { position: absolute; right: 10px; top: 10px; display: flex; gap: 8px; z-index: 2; transition: opacity .2s, visibility .2s; }
+/* Shrunk map: the buttons hide so they do not cover the small map, and come back with the full map */
+#map.collapsed .map-tools, #map.collapsed .map-note { opacity: 0; visibility: hidden; }
+.map-note { position: absolute; top: 56px; left: 10px; right: 10px; z-index: 2; margin: 0; padding: 6px 10px; font-size: 14px; background: var(--card); color: var(--ink); border: 1px solid var(--rule); border-left: 4px solid var(--track); border-radius: var(--radius); }
+.map-note[hidden] { display: none; }
+.map-tools button {
+  font-weight: 700; font-size: 15px;
+  background: var(--card); color: var(--ink); border: 1px solid var(--rule);
+  border-radius: var(--radius); padding: 7px 12px; cursor: pointer;
+}
+.map-tools button[aria-pressed="true"] { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
+/* Content always starts below the full map, even while the map is shrunk */
+main { padding: 0 16px 40px; }
+.wrap { max-width: 640px; margin: 0 auto; padding-top: calc(var(--map-full) + 16px); }
+
+/* Header with the theme switch, same geometry as the roadbook */
+.masthead { display: flex; align-items: flex-start; gap: 12px; border-bottom: 3px double var(--rule); padding-bottom: 12px; margin-bottom: 16px; }
+.masthead h1 { flex: 1; margin: 0; font-weight: 700; font-size: 28px; line-height: 1; }
+.appearance { display: flex; align-items: center; gap: 8px; flex-shrink: 0; padding-top: 4px; }
+.switch { position: relative; width: 40px; height: 22px; margin: 0; padding: 0; border-radius: 11px; border: 1px solid var(--rule); background: var(--switch-bg); cursor: pointer; transition: border-color .25s, background-color .25s; }
+.knob { position: absolute; top: 1px; left: 1px; width: 18px; height: 18px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .25s; }
+.knob svg { position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; color: var(--ink); transition: opacity .25s; }
+.knob .moon { opacity: 0; }
+[data-theme="dark"] .knob { transform: translateX(18px); }
+[data-theme="dark"] .knob .sun { opacity: 0; }
+[data-theme="dark"] .knob .moon { opacity: 1; }
+.auto { margin: 0; padding: 0; border: 0; background: none; font: inherit; font-size: 14px; color: var(--muted); text-decoration: underline dotted; cursor: pointer; }
+.auto[hidden] { display: none; }
+
+/* Next stop sign */
+.plate { background: var(--plate); color: var(--plate-ink); border-radius: 6px; padding: 4px; }
+.plate-in { border: 2px solid var(--plate-line); border-radius: 4px; padding: 12px 16px 14px; }
+.plate h1 { margin: 0; font-size: 16px; font-weight: 500; color: var(--plate-muted); }
+.plate .dest { margin: 0 0 8px; font-size: 32px; font-weight: 700; line-height: 1.05; }
+.plate .row { display: flex; gap: 24px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.plate .row div span { display: block; font-size: 14px; color: var(--plate-muted); }
+.plate .row div strong { font-size: 26px; font-weight: 700; }
+.plate .status { margin-top: 10px; font-size: 17px; }
+.plate .status.late { color: var(--plate-late); }
+.plate .status.early { color: var(--plate-early); }
+
+.warn { margin-top: 10px; background: var(--card-alt); color: var(--ink); border-left: 4px solid var(--track); border-radius: var(--radius); padding: 8px 10px; font-size: 15px; }
+.plate .warn { background: var(--card); color: var(--ink); }
+.err-box { margin-top: 10px; background: var(--track); color: #fff; border-radius: var(--radius); padding: 8px 10px; font-size: 15px; }
+
+.setup-box { margin: 16px 0 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+.setup-box summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+.setup-box summary::-webkit-details-marker { display: none; }
+.setup-sum { flex: 1; font-variant-numeric: tabular-nums; font-size: 16px; }
+.setup-sum.err { color: var(--track); font-weight: 600; }
+.setup-sum strong { font-family: var(--narrow); font-weight: 700; }
+.setup-toggle { font-family: var(--narrow); font-weight: 700; color: var(--primary); white-space: nowrap; }
+.setup-toggle::after { content: "Alterar"; }
+.setup-box[open] .setup-toggle::after { content: "Fechar"; }
+.setup-box[open] summary { border-bottom: 1px solid var(--line); }
+.setup { padding: 12px; display: grid; gap: 12px; }
+.setup-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.setup fieldset { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px 12px; margin: 0; display: flex; gap: 12px; flex-wrap: wrap; align-items: end; background: var(--card-alt); }
+.setup legend { font-weight: 700; padding: 0 4px; font-size: 18px; }
+.setup label { font-size: 14px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+.setup input { font: inherit; font-size: 16px; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 7px 9px; font-variant-numeric: tabular-nums; }
+.setup input[aria-invalid="true"] { border-color: var(--track); box-shadow: inset 0 0 0 1px var(--track); }
+.field-msg { flex-basis: 100%; margin: 0; font-size: 14px; }
+.field-msg:empty { display: none; }
+.field-msg.err { color: var(--track); font-weight: 600; }
+.field-msg.warn-text { color: var(--muted); }
+
+.btn, .actions a, .actions button {
+  font-weight: 700; font-size: 16px; line-height: 1.2;
+  border-radius: var(--radius); padding: 8px 14px; cursor: pointer; text-decoration: none;
+  border: 1px solid var(--rule); background: transparent; color: var(--ink);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.btn.primary, .actions a.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); }
+.btn.primary:hover, .actions a.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+.day-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 12px; }
+
+h2 { font-size: 26px; font-weight: 700; margin: 28px 0 2px; }
+/* One section per day: the heading sticks below the map and the day 2 heading pushes day 1 out.
+   The space above the heading is section padding, so the script can measure where it would sit
+   without sticking. */
+.day { padding-top: 28px; }
+.day > h2 { position: sticky; top: calc(var(--map-h) + env(safe-area-inset-top, 0px)); z-index: 2; margin: 0 0 2px; padding: 4px 0; background: var(--bg); } /* above the timeline dots (z-index 1) */
+.day-sub { color: var(--muted); margin: 0 0 8px; font-size: 15px; font-variant-numeric: tabular-nums; }
+
+ol.stops { list-style: none; margin: 0; padding: 0; position: relative; }
+ol.stops::before { content: ""; position: absolute; left: 63px; top: 10px; bottom: 10px; width: 1px; background: var(--rule); opacity: .45; }
+.stop { position: relative; display: grid; grid-template-columns: 54px 22px 1fr; gap: 0 8px; padding: 8px 0; }
+.stop .time { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 17px; text-align: right; padding-top: 2px; }
+.stop .time small { display: block; font-weight: 500; font-size: 12px; color: var(--muted); }
+.stop .dot { width: 16px; height: 16px; border-radius: 50%; margin: 6px auto 0; background: var(--card); border: 1px solid var(--rule); position: relative; z-index: 1; }
+.stop.fuel .dot, .stop.sleep .dot, .stop.end .dot { background: var(--primary); border-color: var(--primary); }
+.stop.pass .dot { width: 11px; height: 11px; margin-top: 8px; border-style: dotted; }
+.stop.done .dot { background: var(--line); border-color: var(--line); }
+.stop.next .dot { box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 35%, transparent); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%; }
+.stop.done .card { opacity: .55; }
+.stop.late .card { border-left: 4px solid var(--track); }
+.stop.selected .card { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+.card .name { font-family: var(--narrow); font-weight: 700; font-size: 19px; line-height: 1.15; }
+.card .sub { color: var(--muted); font-size: 15px; }
+.card .plan { font-size: 15px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.details { display: none; margin-top: 10px; }
+.stop.selected .details { display: block; }
+.details p { margin: 0 0 8px; font-size: 16px; }
+.details .check { border-left: 3px solid var(--rule); padding: 2px 0 2px 10px; color: var(--muted); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+.roads { display: flex; gap: 6px; margin: 2px 0 2px 84px; flex-wrap: wrap; }
+.shield { font-family: var(--narrow); font-size: 13px; font-weight: 700; line-height: 1; background: #fff; color: #111; border: 2px solid #111; border-radius: 4px 4px 9px 9px; padding: 4px 6px 3px; }
+.shield.state { border-radius: 4px; }
+
+.net-badge { align-self: center; font-family: var(--narrow); font-weight: 700; font-size: 14px; color: #fff; background: var(--track); border-radius: var(--radius); padding: 2px 8px; }
+.net-badge[hidden] { display: none; }
+.offline { margin-top: 28px; }
+.offline p { margin: 4px 0 10px; color: var(--muted); font-size: 15px; }
+.offline progress { width: 100%; height: 8px; margin-bottom: 10px; accent-color: var(--primary); }
+.offline progress[hidden] { display: none; }
+.btn:disabled { opacity: .6; cursor: progress; }
+footer { border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; margin-top: 32px; padding-top: 12px; }
+
+footer a { color: inherit; }
+
+.me-dot { width: 18px; height: 18px; border-radius: 50%; background: var(--track); border: 3px solid var(--card); box-shadow: 0 0 0 6px color-mix(in srgb, var(--track) 30%, transparent); }
+.pin { width: 27px; height: 27px; border-radius: 50%; background: var(--card); color: var(--ink); border: 1px solid var(--rule); font-family: var(--narrow); font-weight: 700; font-size: 14px; display: grid; place-items: center; cursor: pointer; padding: 0; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.pin.pass { width: 13px; height: 13px; border-style: dotted; font-size: 0; }
+.pin.done { background: var(--card-alt); color: var(--muted); border-style: dashed; }
+.maplibregl-ctrl-attrib { font-family: var(--serif); }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition-duration: .01ms !important; } }
+</style>
+</head>
+<body>
+<div id="map" role="region" aria-label="Mapa da viagem">
+  <div class="map-tools">
+    <button id="followBtn" aria-pressed="false">Seguir minha posição</button>
+    <button id="fitBtn">Ver viagem</button>
+  </div>
+  <p class="map-note" id="mapNote" role="status" hidden></p>
+</div>
+<main>
+  <div class="wrap">
+    <header class="masthead">
+      <h1>Campinas a Algodões</h1>
+      <span class="net-badge" id="netBadge" hidden>Sem sinal</span>
+      <div class="appearance">
+        <button type="button" class="auto" hidden id="themeAuto">auto</button>
+        <button type="button" class="switch" role="switch" aria-checked="false" aria-label="Mudar para o tema escuro" id="themeSwitch">
+          <span class="knob">
+            <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+            <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          </span>
+        </button>
+      </div>
+    </header>
+    <section class="plate" aria-live="polite"><div class="plate-in" id="plate"></div></section>
+
+    <details class="setup-box" id="setupBox">
+      <summary>
+        <span class="setup-sum" id="setupSummary">Escolha a data e os horários</span>
+        <span class="setup-toggle" aria-hidden="true"></span>
+      </summary>
+      <div class="setup">
+        <label>Dia da saída
+          <input type="date" id="p-data">
+        </label>
+        <fieldset>
+          <legend>Dia 1</legend>
+          <label>Saída <input type="time" id="p-saida1"></label>
+          <label>Chegar até <input type="time" id="p-chegada1" aria-describedby="msg1"></label>
+          <p class="field-msg" id="msg1" aria-live="polite"></p>
+        </fieldset>
+        <fieldset>
+          <legend>Dia 2</legend>
+          <label>Saída <input type="time" id="p-saida2"></label>
+          <label>Chegar até <input type="time" id="p-chegada2" aria-describedby="msg2"></label>
+          <p class="field-msg" id="msg2" aria-live="polite"></p>
+        </fieldset>
+        <div class="setup-actions">
+          <button class="btn primary" id="setupDone" type="button">Concluir</button>
+          <button class="btn" id="resetBtn" type="button">Limpar paradas feitas</button>
+        </div>
+      </div>
+    </details>
+
+    <div id="days"></div>
+
+    <section class="offline" aria-labelledby="offlineTitle">
+      <h2 id="offlineTitle">Sem internet</h2>
+      <p id="offlineMsg" aria-live="polite"></p>
+      <progress id="offlineBar" max="1" value="0" hidden></progress>
+      <button class="btn primary" id="offlineBtn" type="button">Baixar mapa da rota</button>
+    </section>
+
+    <footer>
+      O botão do Google Maps de cada dia abre a navegação com as paradas que faltam, e ela aparece no Android Auto. O Waze não aceita paradas intermediárias, então ele aparece só em cada parada, no botão Abrir no Waze. Os horários das paradas acompanham o horário de saída de cada dia e usam o melhor caso. No dia 1, o pior caso vem da faixa de 15h10 a 19h10 de estrada do Google Maps. Os limites de Virgem da Lapa e Ubaitaba são fixos, porque dependem da luz do dia. Os postos de plano B vêm do OpenStreetMap de novembro de 2026: confiram antes de contar com eles.
+      A previsão ao vivo usa o servidor público de demonstração do OSRM e costuma ser otimista em serra e pista simples. Sem sinal, a página estima a chegada pela rota guardada e pela velocidade média do plano.
+      Mapa © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, base <a href="https://openfreemap.org">OpenFreeMap</a>.
+    </footer>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js" crossorigin="anonymous"></script>
+<script>
+/* Times from the original plan, leaving at 00:00 on day 1 and at 06:30 on day 2.
+   Changing the departure shifts everything along with it. */
+const BASE = { 1: "00:00", 2: "06:30" };
+const DEFAULTS = { data: "", saida1: "00:00", chegada1: "18:00", saida2: "06:30", chegada2: "17:00" };
+
+/* alt: backup fuel stop, before and after each chosen station. It never becomes the next stop,
+   raises no overdue warning and has no mark-as-done button. Towns and stations come from
+   OpenStreetMap (queried on 2026-11-13), with the point on a station less than 100 m from the
+   route; the time is interpolated by distance between the neighbouring stops of the plan. */
+const STOPS = [
+  { id: "inicio", day: 1, kind: "start", name: "Campinas", sub: "Saída", lat: -22.9056, lng: -47.0608, depart: "00:00",
+    note: "Tanque cheio desde a véspera." },
+  { id: "perdoes", day: 1, kind: "pass", alt: true, name: "Perdões", sub: "Plano B de combustível", lat: -21.108312, lng: -45.092526,
+    arrive: "03:50", note: "Antes de Oliveira: 8 postos na Fernão Dias. O do mapa aparece como 24 h no OpenStreetMap." },
+  { id: "oliveira", day: 1, kind: "fuel", name: "Posto Juá (Petrobras)", sub: "Oliveira, Fernão Dias · 24h", lat: -20.7317666, lng: -44.7727052,
+    arrive: "04:30", depart: "04:45", roads: ["SP 065", "BR 381"], note: "1º abastecimento, uns 420 km. Troca de motorista." },
+  { id: "carmopolis", day: 1, kind: "pass", alt: true, name: "Carmópolis de Minas", sub: "Plano B de combustível", lat: -20.539664, lng: -44.642117,
+    arrive: "05:05", note: "Se o posto de Oliveira estiver fechado: 3 postos na Fernão Dias." },
+  { id: "curvelo", day: 1, kind: "pass", alt: true, name: "Curvelo", sub: "Plano B de combustível", lat: -18.7566, lng: -44.4307,
+    arrive: "08:00", roads: ["BR 381", "BR 040"], note: "Contagem antes das 6h30 para escapar do pico. Só parem aqui se a reserva acender." },
+  { id: "diamantina", day: 1, kind: "fuel", name: "Desk Real D’Ávila (Petrobras)", sub: "Diamantina, na BR-367 · 24h", lat: -18.2400697, lng: -43.6244268,
+    arrive: "10:00", depart: "10:20", roads: ["BR 259", "BR 367"],
+    note: "Encham o tanque: até Itaobim os postos são poucos. Troquem de motorista antes do trecho sinuoso.",
+    check: { by: "12:00", rel: true, text: "Passando depois desse horário, encurtem as paradas." } },
+  { id: "mendanha", day: 1, kind: "pass", alt: true, name: "Mendanha", sub: "Plano B de combustível", lat: -18.079484, lng: -43.474616,
+    arrive: "10:40", note: "Se o posto de Diamantina estiver fechado: 3 postos na BR-367. Daqui em diante os postos rareiam." },
+  { id: "turmalina", day: 1, kind: "pass", alt: true, name: "Turmalina", sub: "Plano B de combustível", lat: -17.286112, lng: -42.730844,
+    arrive: "12:15", roads: ["BR 367"],
+    note: "No meio do trecho com poucos postos. Daqui sigam por Leme do Prado e Ijicatu, no asfalto, e não pela BR-367 de terra por Chapada do Norte." },
+  { id: "virgem", day: 1, kind: "pass", name: "Virgem da Lapa", sub: "Fim do desvio por Ijicatu · plano B de combustível", lat: -16.8075, lng: -42.3430,
+    arrive: "13:45", roads: ["LMG 677", "MG 114"], note: "Asfalto com buracos entre Ijicatu e Virgem da Lapa: devagar. Há 3 postos na cidade.",
+    check: { by: "16:00", text: "Passando depois das 16h, a chegada a Itaobim fica para depois das 18h." } },
+  { id: "itaobim", day: 1, kind: "fuel", name: "Posto Transanimais (Petrobras)", sub: "Itaobim, BR-116 · 24h", lat: -16.6206428, lng: -41.5022667,
+    arrive: "15:45", depart: "16:00", roads: ["BR 367"], note: "Abasteçam na chegada para sair cedo sem parar. O centro de Itaobim fica uns 7 km adiante pela BR-116." },
+  { id: "pernoite", day: 1, kind: "sleep", name: "Itaobim", sub: "Pernoite", lat: -16.561859, lng: -41.5024806,
+    query: "Itaobim, MG", arrive: "16:10", roads: ["BR 116"] }, /* by name, Google does not show a street address */
+
+  { id: "itaobim2", day: 2, kind: "start", name: "Itaobim", sub: "Saída do dia 2", lat: -16.561859, lng: -41.5024806, depart: "06:30",
+    note: "Tanque cheio desde a noite anterior.", hidePin: true },
+  { id: "medina", day: 2, kind: "pass", alt: true, name: "Medina", sub: "Plano B de combustível", lat: -16.319235, lng: -41.477267,
+    arrive: "06:55", note: "Se faltou abastecer em Itaobim: 4 postos na BR-116." },
+  { id: "conquista", day: 2, kind: "pass", alt: true, name: "Vitória da Conquista", sub: "Plano B de combustível", lat: -14.8615, lng: -40.8442,
+    arrive: "09:45", roads: ["BR 116"], note: "Só parem se a reserva acender." },
+  { id: "pocoes", day: 2, kind: "pass", alt: true, name: "Poções", sub: "Plano B de combustível", lat: -14.482752, lng: -40.336888,
+    arrive: "10:45", note: "Antes de Jequié: 6 postos na BR-116." },
+  { id: "jequie", day: 2, kind: "fuel", name: "Posto Carvalho", sub: "Jequié, BR-116 km 714 · 24h", lat: -13.8854659, lng: -40.1394871,
+    arrive: "11:45", depart: "12:05", roads: ["BR 116"], note: "Único abastecimento obrigatório do dia 2." },
+  { id: "ubata", day: 2, kind: "pass", alt: true, name: "Ubatã", sub: "Plano B de combustível", lat: -14.201204, lng: -39.533443,
+    arrive: "13:30", note: "Entre Jequié e Ubaitaba: 8 postos na rota." },
+  { id: "ubaitaba", day: 2, kind: "fuel", name: "Posto São Marcos", sub: "Ubaitaba, BR-101 · 24h", lat: -14.3056654, lng: -39.3228096,
+    arrive: "14:00", depart: "14:15", roads: ["BR 330", "BR 101"], note: "Opcional: completem antes da península, onde há poucos postos.",
+    check: { by: "16:00", text: "Saindo daqui depois das 16h, a terra fica para o escuro." } },
+  { id: "marau", day: 2, kind: "pass", alt: true, name: "Maraú", sub: "Plano B de combustível", lat: -14.108489, lng: -38.981762,
+    arrive: "15:45", note: "Últimos postos antes de Algodões: 2 na cidade." },
+  { id: "algodoes", day: 2, kind: "end", name: "Praia de Algodões", sub: "Península de Maraú", lat: -13.965, lng: -38.94,
+    query: "Praia de Algodões, Maraú, BA", arrive: "16:15", roads: ["BR 030"],
+    note: "Os últimos quilômetros são de terra: devagar e com luz. A posição no mapa é aproximada; a rota usa o nome da praia." }
+];
+const VIA = { curvelo: [[-44.2468, -19.4658]], virgem: [[-42.694, -17.081]] };
+const LAST = { 1: "pernoite", 2: "algodoes" };
+/* Driving time only, in minutes. Day 1: Google Maps range (15h10 to 19h10).
+   Day 2: no range, uses the estimated plan. */
+/* Whole-day route in Google Maps (up to 9 waypoints). Only mandatory stops go in: each point
+   becomes a stop with an address in the navigation. Without waypoints, Google already goes
+   from Diamantina to Itaobim on BR-367 to Turmalina, on LMG-677 (the paved detour through
+   Ijicatu) to Virgem da Lapa and on BR-367 through Araçuaí (checked on 2026-11-13). The day
+   ends in the centre of Itaobim, after the fuel station. */
+const DAY_ROUTE = {
+  1: ["oliveira", "diamantina", "itaobim", "pernoite"],
+  2: ["jequie", "ubaitaba", "algodoes"]
+};
+const DRIVE = { 1: { min: 15 * 60 + 10, max: 19 * 60 + 10, source: "Google Maps" } };
+
+/* Parameters: URL first, then what was saved, then the default.
+   E.g.: ?data=2026-12-19&saida1=00:00&chegada1=18:00&saida2=06:30&chegada2=17:00 */
+const store = {
+  get(k) { try { return localStorage.getItem("copiloto-marau:" + k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem("copiloto-marau:" + k, v); } catch (e) {} }
+};
+/* A reload opens at the top: the map is built for its full height */
+try { history.scrollRestoration = "manual"; } catch (e) {}
+const qs = new URLSearchParams(location.search);
+const P = {};
+Object.keys(DEFAULTS).forEach((k) => {
+  const fromUrl = qs.get(k);
+  const ok = k === "data" ? /^\d{4}-\d{2}-\d{2}$/ : /^\d{2}:\d{2}$/;
+  P[k] = fromUrl && ok.test(fromUrl) ? fromUrl : (store.get(k) || DEFAULTS[k]);
+});
+let done = new Set(JSON.parse(store.get("done") || "[]"));
+let selected = null, me = null, eta = null, lastEtaFetch = 0, follow = false;
+
+const $ = (s) => document.querySelector(s);
+
+/* Theme: follows the clock (dark from 18:00 to 06:00) until the switch is used; the choice is
+   saved and "auto" hands control back to the clock. Same "theme" key as the roadbook. */
+const theme = () => document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+const themeByClock = () => { const h = new Date().getHours(); return (h >= 18 || h < 6) ? "dark" : "light"; };
+let themeMode = "auto";
+try { themeMode = localStorage.getItem("theme") || "auto"; } catch (e) {}
+if (["auto", "light", "dark"].indexOf(themeMode) === -1) themeMode = "auto";
+function applyTheme() {
+  const before = theme();
+  document.documentElement.setAttribute("data-theme", themeMode === "auto" ? themeByClock() : themeMode);
+  const dark = theme() === "dark";
+  const sw = document.getElementById("themeSwitch");
+  sw.setAttribute("aria-checked", String(dark));
+  sw.setAttribute("aria-label", dark ? "Mudar para o tema claro" : "Mudar para o tema escuro");
+  document.getElementById("themeAuto").hidden = themeMode === "auto";
+  if (before !== theme()) document.dispatchEvent(new CustomEvent("theme"));
+}
+function pickTheme(mode) {
+  themeMode = mode;
+  try { localStorage.setItem("theme", mode); } catch (e) {}
+  applyTheme();
+}
+document.getElementById("themeSwitch").addEventListener("click", () => pickTheme(theme() === "dark" ? "light" : "dark"));
+document.getElementById("themeAuto").addEventListener("click", () => pickTheme("auto"));
+applyTheme();
+setInterval(() => { if (themeMode === "auto") applyTheme(); }, 300000);
+const pad = (n) => String(n).padStart(2, "0");
+const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+const fmtMin = (m) => pad(Math.floor(((m % 1440) + 1440) % 1440 / 60)) + ":" + pad(((m % 60) + 60) % 60);
+const fmt = (d) => pad(d.getHours()) + ":" + pad(d.getMinutes());
+function esc(t) { return String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+/* Minutes since midnight of the leg's day (can exceed 1440) */
+function planMin(stop, which) {
+  if (!stop[which]) return null;
+  let rel = toMin(stop[which]) - toMin(BASE[stop.day]);
+  if (rel < 0) rel += 1440;
+  return toMin(P["saida" + stop.day]) + rel;
+}
+function checkMin(stop) {
+  if (!stop.check) return null;
+  if (!stop.check.rel) return toMin(stop.check.by);
+  let rel = toMin(stop.check.by) - toMin(BASE[stop.day]);
+  return toMin(P["saida" + stop.day]) + rel;
+}
+function toDate(day, min) {
+  if (!P.data || min === null) return null;
+  const [y, m, d] = P.data.split("-").map(Number);
+  return new Date(y, m - 1, d + (day - 1), 0, min);
+}
+function showTime(min) {
+  if (min === null) return "—";
+  return fmtMin(min) + (min >= 1440 ? " (+1)" : "");
+}
+/* Validation: the estimated plan has a driving time and a stop time.
+   If the window between departure and arrival is shorter than the driving, the day is impossible;
+   if it is shorter than driving + stops, it only fits by cutting stops. */
+function dayStats(day) {
+  const list = STOPS.filter((s) => s.day === day);
+  const start = list.find((s) => s.kind === "start");
+  const last = STOPS.find((s) => s.id === LAST[day]);
+  let total = toMin(last.arrive) - toMin(start.depart);
+  if (total < 0) total += 1440;
+  const stops = list.reduce((acc, s) => acc + (s.arrive && s.depart ? toMin(s.depart) - toMin(s.arrive) : 0), 0);
+  const d = DRIVE[day];
+  const drive = d ? d.min : total - stops;
+  const driveMax = d ? d.max : null;
+  return { total: drive + stops, stops, drive, driveMax, worst: driveMax ? driveMax + stops : null, source: d ? d.source : null };
+}
+function limitMin(day) {
+  let lim = toMin(P["chegada" + day]);
+  if (lim <= toMin(P["saida" + day])) lim += 1440; /* arrival before departure = next day */
+  return lim;
+}
+const hm = (m) => m < 60 ? m + " min" : Math.floor(m / 60) + "h" + (m % 60 ? pad(m % 60) : "");
+function validateDay(day) {
+  const st = dayStats(day);
+  const win = limitMin(day) - toMin(P["saida" + day]);
+  const issues = [];
+  let level = "ok";
+  if (win < st.drive) {
+    level = "err";
+    issues.push("Não dá: só de estrada são uns " + hm(st.drive) + ", e a janela escolhida tem " + hm(win) + ".");
+  } else if (win < st.total) {
+    level = "warn";
+    issues.push("Só cabe cortando paradas: o plano leva " + hm(st.total) + " com " + hm(st.stops) + " de paradas, e a janela tem " + hm(win) + ".");
+  }
+  /* Daylight limits, which do not move with the departure */
+  STOPS.filter((s) => s.day === day && s.check && !s.check.rel).forEach((s) => {
+    const when = planMin(s, s.depart ? "depart" : "arrive");
+    const tod = when % 1440; /* time of day, even if it falls on the next day */
+    if (tod > toMin(s.check.by) || tod < toMin("05:30")) {
+      if (level === "ok") level = "warn";
+      issues.push("Com essa saída, vocês passam por " + s.name + " às " + showTime(when) + ", fora da luz do dia (limite " + s.check.by + ").");
+    }
+  });
+  return { level, issues, win };
+}
+function stopLimit(stop) {
+  return stop.check ? checkMin(stop) : planMin(stop, "arrive");
+}
+function overdue(day) {
+  if (!P.data) return [];
+  const now = new Date();
+  const dayStart = toDate(day, 0);
+  if (now < dayStart || now - dayStart > 36 * 3600000) return [];
+  return STOPS.filter((s) => s.day === day && s.kind !== "start" && !s.alt && !done.has(s.id))
+    .map((s) => ({ s, min: stopLimit(s), at: toDate(day, stopLimit(s)) }))
+    .filter((x) => x.at && now > x.at);
+}
+function dayRouteLink(day) {
+  const pts = DAY_ROUTE[day].filter((x) =>
+    typeof x === "string" ? !done.has(x) : !done.has(x.before)
+  ).map((x) => typeof x === "string" ? STOPS.find((s) => s.id === x) : x);
+  if (!pts.length) return null;
+  const last = pts.pop();
+  const coord = (p) => p.lat + "," + p.lng;
+  let url = "https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" +
+    (last.query ? encodeURIComponent(last.query) : coord(last));
+  if (pts.length) url += "&waypoints=" + pts.map(coord).join("%7C");
+  if (me) url += "&origin=" + coord(me);
+  return { url, count: pts.filter((p) => p.id).length };
+}
+function renderSetupSummary() {
+  const el = $("#setupSummary");
+  const bad = [1, 2].filter((d) => validateDay(d).level === "err");
+  if (!P.data) { el.className = "setup-sum"; el.textContent = "Escolha a data e os horários"; return; }
+  const [y, m, d] = P.data.split("-").map(Number);
+  const when = new Date(y, m - 1, d).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" });
+  el.className = "setup-sum" + (bad.length ? " err" : "");
+  el.innerHTML = "<strong>" + esc(when) + "</strong> · Dia 1: " + P.saida1 + " a " + showTime(limitMin(1)) +
+    " · Dia 2: " + P.saida2 + " a " + showTime(limitMin(2)) +
+    (bad.length ? " · Horário impossível no dia " + bad.join(" e ") : "");
+}
+function renderValidation() {
+  renderSetupSummary();
+  [1, 2].forEach((day) => {
+    const v = validateDay(day);
+    const input = $("#p-chegada" + day), msg = $("#msg" + day);
+    input.setAttribute("aria-invalid", String(v.level === "err"));
+    input.setCustomValidity(v.level === "err" ? v.issues[0] : "");
+    msg.className = "field-msg " + (v.level === "err" ? "err" : "warn-text");
+    msg.textContent = v.issues[0] || "";
+  });
+}
+function nextStop() { return STOPS.find((s) => s.kind !== "start" && !s.alt && !done.has(s.id)) || null; }
+function navLinks(s) {
+  const dest = s.query ? encodeURIComponent(s.query) : s.lat + "," + s.lng;
+  let g = "https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" + dest;
+  if (me) g += "&origin=" + me.lat + "," + me.lng;
+  return { g, w: "https://waze.com/ul?ll=" + s.lat + "," + s.lng + "&navigate=yes" };
+}
+
+function renderPlate() {
+  const n = nextStop(), el = $("#plate");
+  if (!n) { el.innerHTML = '<h1>Viagem concluída</h1><p class="dest">Boa praia em Algodões</p>'; return; }
+  const arrMin = planMin(n, "arrive");
+  const arr = toDate(n.day, arrMin);
+  let status = "";
+  if (!P.data) status = '<div class="status">Defina o dia da saída para comparar com o plano.</div>';
+  else if (eta && eta.stopId === n.id && arr) {
+    const diff = Math.round((eta.at - arr) / 60000);
+    const cls = diff > 10 ? "late" : diff < -10 ? "early" : "";
+    const txt = Math.abs(diff) <= 10 ? "Dentro do plano" : diff > 0 ? diff + " min atrasado" : (-diff) + " min adiantado";
+    status = '<div class="status ' + cls + '">Previsão de chegada ' + fmt(eta.at) +
+      (eta.km !== undefined ? ', faltam ' + eta.km + ' km' : '') + '. ' + txt + '.' +
+      (eta.offline ? ' Estimativa sem sinal, pela média do plano.' : '') + '</div>';
+  } else if (!me) status = '<div class="status">' + esc(geoMessage("Ative a localização para ver a previsão ao vivo.")) + '</div>';
+  let warn = "";
+  if (n.check && overdue(n.day).some((x) => x.s.id === n.id)) warn = '<div class="warn">' + esc(n.check.text) + '</div>';
+  el.innerHTML =
+    '<h1>Próxima parada · dia ' + n.day + '</h1>' +
+    '<p class="dest">' + esc(n.name) + '</p>' +
+    '<div class="row"><div><span>Chegar às</span><strong>' + showTime(arrMin) + '</strong></div>' +
+    (n.depart ? '<div><span>Sair às</span><strong>' + showTime(planMin(n, "depart")) + '</strong></div>' : "") +
+    '</div>' + status + warn;
+}
+
+function renderDays() {
+  const n = nextStop(), wrap = $("#days");
+  wrap.innerHTML = "";
+  [1, 2].forEach((day) => {
+    const last = STOPS.find((s) => s.id === LAST[day]);
+    const arr = planMin(last, "arrive");
+    const lim = limitMin(day);
+    const sec = document.createElement("section");
+    sec.className = "day";
+    const h = document.createElement("h2");
+    h.textContent = day === 1 ? "Dia 1: Campinas a Itaobim" : "Dia 2: Itaobim a Algodões";
+    const p = document.createElement("p");
+    p.className = "day-sub";
+    const st = dayStats(day);
+    const worstTxt = st.worst ? " Com trânsito ruim, até " + showTime(toMin(P["saida" + day]) + st.worst) + "." : "";
+    p.textContent = "Saída " + P["saida" + day] + ". Chegada prevista " + showTime(arr) + ", limite " + showTime(lim) + "." + worstTxt;
+    sec.append(h, p);
+    const route = dayRouteLink(day);
+    /* Google Maps only: the Waze link takes a single destination, so Waze stays on each stop */
+    if (route) {
+      const box = document.createElement("div");
+      box.className = "day-actions";
+      const a = document.createElement("a");
+      a.className = "btn primary";
+      a.href = route.url; a.target = "_blank"; a.rel = "noopener";
+      a.textContent = "Abrir o dia " + day + " no Google Maps";
+      box.append(a);
+      sec.append(box);
+    }
+    const v = validateDay(day);
+    const late = overdue(day);
+    if (late.length) {
+      const w = document.createElement("div");
+      w.className = "warn";
+      w.setAttribute("role", "status");
+      w.textContent = "Horário vencido e parada não marcada como feita: " +
+        late.map((x) => x.s.name + " (" + showTime(x.min) + ")").join(", ") + ".";
+      sec.append(w);
+    }
+    v.issues.forEach((txt) => {
+      const w = document.createElement("div");
+      w.className = v.level === "err" ? "err-box" : "warn";
+      w.setAttribute("role", v.level === "err" ? "alert" : "status");
+      w.textContent = txt;
+      sec.append(w);
+    });
+    const ol = document.createElement("ol");
+    ol.className = "stops";
+    STOPS.filter((s) => s.day === day).forEach((s) => {
+      if (s.roads) {
+        const r = document.createElement("li");
+        r.className = "roads";
+        r.innerHTML = s.roads.map((x) => '<span class="shield' + (/^BR/.test(x) ? "" : " state") + '">' + esc(x) + "</span>").join("");
+        ol.appendChild(r);
+      }
+      const a = planMin(s, "arrive"), d = planMin(s, "depart");
+      const li = document.createElement("li");
+      li.id = "stop-" + s.id;
+      const isLate = overdue(day).some((x) => x.s.id === s.id);
+      li.className = "stop " + s.kind + (done.has(s.id) ? " done" : "") + (isLate ? " late" : "") + (n && n.id === s.id ? " next" : "") + (selected === s.id ? " selected" : "");
+      const t = a !== null ? a : d;
+      const plan = [a !== null ? "Chegar " + showTime(a) : "", d !== null ? "Sair " + showTime(d) : ""].filter(Boolean).join(", ");
+      const ck = checkMin(s);
+      const links = navLinks(s);
+      li.innerHTML =
+        '<div class="time">' + fmtMin(t) + (t >= 1440 ? "<small>dia seguinte</small>" : "") + '</div><div class="dot"></div>' +
+        '<div><button class="card" type="button" aria-expanded="' + (selected === s.id) + '">' +
+          '<div class="name">' + esc(s.name) + '</div><div class="sub">' + esc(s.sub) + '</div>' +
+          '<div class="plan">' + plan + '</div></button>' +
+          '<div class="details">' +
+            (s.note ? '<p>' + esc(s.note) + '</p>' : "") +
+            (ck !== null ? '<p class="check">Limite: ' + showTime(ck) + '. ' + esc(s.check.text) + '</p>' : "") +
+            (s.kind === "start" ? "" :
+            '<div class="actions">' +
+              '<a class="primary" href="' + links.g + '" target="_blank" rel="noopener">Rota no Google Maps</a>' +
+              '<a href="' + links.w + '" target="_blank" rel="noopener">Abrir no Waze</a>' +
+              (s.alt ? "" : '<button type="button" data-done="' + s.id + '">' + (done.has(s.id) ? "Desmarcar" : "Marcar como feita") + '</button>') +
+            '</div>') +
+          '</div></div>';
+      li.querySelector(".card").addEventListener("click", () => select(s.id, true));
+      const b = li.querySelector("[data-done]");
+      if (b) b.addEventListener("click", () => toggleDone(s.id));
+      ol.appendChild(li);
+    });
+    sec.append(ol);
+    wrap.append(sec);
+  });
+  queueSync(); /* the content changed: the day 1 heading may have moved */
+}
+
+function toggleDone(id) {
+  done.has(id) ? done.delete(id) : done.add(id);
+  store.set("done", JSON.stringify([...done]));
+  eta = null; lastEtaFetch = 0;
+  renderAll(); updatePins(); refreshEta();
+}
+function select(id, fromList) {
+  selected = selected === id && fromList ? null : id;
+  renderDays();
+  if (!selected) return;
+  if (follow) setFollow(false); /* a stop tap takes over the camera, like a drag; otherwise the next GPS fix would pull it back */
+  const s = STOPS.find((x) => x.id === id);
+  const fly = () => { if (map && s) map.flyTo({ center: [s.lng, s.lat], zoom: Math.max(map.getZoom(), 9) }); };
+  if (fromList) { fly(); return; }
+  /* Pin tap: the list scrolls and the map shrinks. The flight comes after, because resizing the
+     map mid-flight shifts the destination. */
+  scrollStopToLine(id);
+  afterScroll(fly);
+}
+/* Calls fn once scrolling stops (or right away if nothing scrolls) */
+function afterScroll(fn) {
+  let timer = setTimeout(done, 150);
+  function again() { clearTimeout(timer); timer = setTimeout(done, 150); }
+  function done() { removeEventListener("scroll", again); fn(); }
+  addEventListener("scroll", again, { passive: true });
+}
+function renderAll() { renderPlate(); renderDays(); renderValidation(); }
+
+/* Map */
+let map = null;
+const pins = {};
+let meMarker = null;
+const BOUNDS = [[-47.3, -23.1], [-38.7, -13.6]];
+/* Padding so the buttons at the top and the (i) at the bottom do not cover edge pins */
+const FIT = { padding: { top: 64, bottom: 48, left: 30, right: 30 } };
+function mapFailed() {
+  map = null;
+  const m = document.createElement("div");
+  m.className = "map-msg";
+  m.textContent = "O mapa não carregou aqui. A lista de paradas e os links de rota continuam funcionando.";
+  $("#map").appendChild(m);
+  document.querySelector(".map-tools").hidden = true;
+}
+const LIBERTY = "https://tiles.openfreemap.org/styles/liberty";
+const FIORD = "https://tiles.openfreemap.org/styles/fiord";
+const NIGHT_FILLS = {
+  "background": "#163E31", "water": "#0A2B33", "waterway": "#13414D",
+  "landcover_wood": "rgba(10,42,32,.55)", "landcover_ice_shelf": "#163E31",
+  "park": "#1B4638", "park_outline": "#24533F", "building": "rgba(10,42,32,.6)",
+  "highway_path": "#2E5B4B", "highway_minor": "#2E5B4B",
+  "highway_major_casing": "#3E6A5A", "highway_major_inner": "#1F4A3B",
+  "highway_major_subtle": "#24533F", "highway_motorway_casing": "#5E8A79",
+  "highway_motorway_inner": "#2E5B4B", "highway_motorway_subtle": "rgba(127,169,154,.2)",
+  "tunnel_motorway_casing": "#2E5B4B", "tunnel_motorway_inner": "#163E31",
+  "aeroway-taxiway": "#2E5B4B", "aeroway-runway-casing": "#2E5B4B",
+  "aeroway-area": "#1F4A3B", "aeroway-runway": "#1F4A3B",
+  "road_area_pier": "#163E31", "road_pier": "#163E31",
+  "railway": "#0A2A20", "railway_dashline": "#2E5B4B",
+  "railway_transit": "#0A2A20", "railway_transit_dashline": "#2E5B4B",
+  "railway_service": "#0A2A20", "railway_service_dashline": "#2E5B4B",
+  "boundary_state": "rgba(127,169,154,.35)",
+  "boundary_country_z0-4": "#B9D2C7", "boundary_country_z5-": "#B9D2C7"
+};
+const HALO = "rgba(10,42,32,.8)";
+const NIGHT_LABELS = {
+  "water_name": ["#6FA3B3", "#0A2B33"], "highway_name_other": ["#7FA99A", "#163E31"],
+  "highway_ref": ["#B9D2C7", "#0E3B2E"], "place_other": ["#B9D2C7", HALO],
+  "place_suburb": ["#7FA99A", HALO], "place_village": ["#9DBFB2", HALO],
+  "place_town": ["#DCEAE3", HALO], "place_city": ["#FFFFFF", HALO],
+  "place_city_large": ["#FFFFFF", HALO], "place_state": ["#6F988A", HALO],
+  "place_country_other": ["#B9D2C7", HALO], "place_country_minor": ["#B9D2C7", HALO],
+  "place_country_major": ["#B9D2C7", HALO], "place_continent": ["#FFFFFF", HALO]
+};
+let nightStyle = null;
+function nightBasemap() {
+  return nightStyle || (nightStyle = fetch(FIORD)
+    .then((r) => r.ok ? r.json() : Promise.reject(r.status))
+    .then((style) => {
+      style.layers.forEach((layer) => {
+        const paint = layer.paint || (layer.paint = {});
+        const fill = NIGHT_FILLS[layer.id], label = NIGHT_LABELS[layer.id];
+        if (fill) ["background-color", "fill-color", "line-color"].forEach((k) => { if (k in paint) paint[k] = fill; });
+        if (label) { paint["text-color"] = label[0]; paint["text-halo-color"] = label[1]; }
+      });
+      return style;
+    })
+    .catch(() => FIORD));
+}
+const basemapStyle = (t) => t === "light"
+  ? Promise.resolve(LIBERTY)
+  : nightBasemap().then((st) => typeof st === "string" ? st : structuredClone(st));
+/* Route in navigation blue, as in the roadbook; the edge is the page colour. */
+const PALETTE = {
+  light: { route: "#0172AD", edge: "#FDFBF4" },
+  dark: { route: "#4DB2FF", edge: "#0A2A20" }
+};
+let routeGeometry = null;
+function addRouteLayers() {
+  if (!map || !routeGeometry || map.getSource("route")) return;
+  const pal = PALETTE[theme()];
+  const layout = { "line-cap": "round", "line-join": "round" };
+  map.addSource("route", { type: "geojson", data: { type: "Feature", geometry: routeGeometry } });
+  map.addLayer({ id: "route-edge", type: "line", source: "route", paint: { "line-color": pal.edge, "line-width": 8 }, layout });
+  map.addLayer({ id: "route", type: "line", source: "route", paint: { "line-color": pal.route, "line-width": 4.5 }, layout });
+}
+async function initMap() {
+  if (!window.maplibregl) { mapFailed(); return; }
+  try {
+    map = new maplibregl.Map({
+      container: "map",
+      style: await basemapStyle(theme()),
+      bounds: BOUNDS, fitBoundsOptions: FIT,
+      attributionControl: { compact: true }
+    });
+  } catch (e) { mapFailed(); return; }
+  /* Dragging the map turns Follow off */
+  map.on("dragstart", () => setFollow(false));
+  map.on("style.load", addRouteLayers); /* changing the theme swaps the style and drops the layers */
+  document.addEventListener("theme", () => {
+    basemapStyle(theme()).then((st) => map && map.setStyle(st, { diff: false }));
+  });
+  let n = 0;
+  STOPS.forEach((s) => {
+    if (s.hidePin) return;
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "pin" + (s.kind === "pass" ? " pass" : "");
+    el.addEventListener("click", (e) => { e.stopPropagation(); select(s.id, false); });
+    if (s.kind !== "pass") el.textContent = ++n;
+    const marker = new maplibregl.Marker({ element: el }).setLngLat([s.lng, s.lat]).addTo(map);
+    el.setAttribute("aria-label", s.name); /* after addTo, which replaces the label with "Map marker" */
+    pins[s.id] = { el, marker };
+  });
+  updatePins();
+  placeMe();
+}
+/* Only touches "done": replacing the whole className would drop the class MapLibre uses to position the pin */
+function updatePins() {
+  Object.entries(pins).forEach(([id, p]) => p.el.classList.toggle("done", done.has(id)));
+}
+/* The route line comes from OSRM once and is stored in the browser. It draws the map
+   and feeds the offline estimate. The key changes if the stops change. */
+let routeIndex = null; /* cumulative distances along the route, in km */
+function routePoints() {
+  const pts = [];
+  STOPS.forEach((s) => {
+    if (s.hidePin) return;
+    (VIA[s.id] || []).forEach((v) => pts.push(v));
+    pts.push([s.lng, s.lat]);
+  });
+  return pts;
+}
+function kmBetween(a, b) {
+  const R = 6371, rad = Math.PI / 180;
+  const dLat = (b[1] - a[1]) * rad, dLng = (b[0] - a[0]) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * rad) * Math.cos(b[1] * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function buildRouteIndex(coords) {
+  const cum = [0];
+  for (let i = 1; i < coords.length; i++) cum.push(cum[i - 1] + kmBetween(coords[i - 1], coords[i]));
+  return { coords, cum };
+}
+function nearestOnRoute(lng, lat) {
+  const c = routeIndex.coords;
+  let best = 0, bestD = Infinity;
+  const k = Math.cos(lat * Math.PI / 180);
+  for (let i = 0; i < c.length; i++) {
+    const dx = (c[i][0] - lng) * k, dy = c[i][1] - lat, d = dx * dx + dy * dy;
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return { i: best, offKm: kmBetween(c[best], [lng, lat]) };
+}
+async function loadRoute() {
+  const pts = routePoints();
+  const key = pts.map((p) => p.join(",")).join(";");
+  let geometry = null;
+  try {
+    const saved = JSON.parse(store.get("route") || "null");
+    if (saved && saved.key === key) geometry = saved.geometry;
+  } catch (e) {}
+  if (!geometry) {
+    try {
+      const url = "https://router.project-osrm.org/route/v1/driving/" + key + "?overview=full&geometries=geojson";
+      const j = await (await fetch(url)).json();
+      if (j.routes && j.routes[0]) {
+        geometry = j.routes[0].geometry;
+        geometry.coordinates = geometry.coordinates.map(([x, y]) => [Math.round(x * 1e5) / 1e5, Math.round(y * 1e5) / 1e5]);
+        store.set("route", JSON.stringify({ key, geometry }));
+      }
+    } catch (e) { /* no signal and no saved copy: keep straight lines between the stops */ }
+  }
+  routeGeometry = geometry || { type: "LineString", coordinates: pts };
+  routeIndex = buildRouteIndex(routeGeometry.coordinates);
+  renderOffline();
+  /* If the style has loaded but tiles are still arriving, style.load has already fired: wait for the map to settle */
+  if (map && map.isStyleLoaded()) addRouteLayers();
+  else if (map) map.once("idle", addRouteLayers);
+}
+
+/* Location */
+function setFollow(v) {
+  follow = v;
+  $("#followBtn").setAttribute("aria-pressed", String(v));
+  showMapNote(v && !me ? geoMessage(FOLLOW_WAIT) : ""); /* with no position, say why instead of doing nothing */
+  followZoomPending = v && !me;
+  if (v && me && map) map.easeTo({ center: [me.lng, me.lat], zoom: Math.max(map.getZoom(), 11) });
+}
+/* Also runs when the map finishes building: the first position can arrive before it, and with
+   the phone standing still the GPS sends no other */
+function placeMe() {
+  if (!map || !me) return;
+  if (!meMarker) {
+    const el = document.createElement("div");
+    el.className = "me-dot";
+    el.setAttribute("aria-label", "Sua posição");
+    meMarker = new maplibregl.Marker({ element: el }).setLngLat([me.lng, me.lat]).addTo(map);
+  } else meMarker.setLngLat([me.lng, me.lat]);
+  if (!follow) return;
+  /* Zoom in only the first time (Follow tapped before a position existed); after that only
+     re-centre, so the zoom the person chose is kept */
+  map.easeTo(followZoomPending ? { center: [me.lng, me.lat], zoom: Math.max(map.getZoom(), 11) } : { center: [me.lng, me.lat] });
+  followZoomPending = false;
+}
+let followZoomPending = false;
+let geoError = null;
+const FOLLOW_WAIT = "Procurando sua posição. Se o navegador pedir, permita a localização.";
+/* Why there is no position yet. Outside https (and localhost) the browser denies location. */
+function geoMessage(waiting) {
+  if (!("geolocation" in navigator)) return "Este navegador não informa a localização.";
+  if (!window.isSecureContext) return "A localização só funciona em endereço seguro (https). Por este endereço, a previsão ao vivo e o Seguir minha posição ficam desligados.";
+  if (geoError && geoError.code === 1) return "A localização está bloqueada para esta página. Libere nas permissões do navegador.";
+  if (geoError) return "Ainda sem localização. Confira se o GPS está ligado.";
+  return waiting;
+}
+function showMapNote(text) {
+  const note = $("#mapNote");
+  note.textContent = text;
+  note.hidden = !text;
+}
+function startGeo() {
+  if (!("geolocation" in navigator)) { renderPlate(); return; }
+  navigator.geolocation.watchPosition((pos) => {
+    me = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    geoError = null;
+    showMapNote("");
+    placeMe();
+    refreshEta();
+    renderAll();
+  }, (err) => {
+    geoError = err;
+    if (follow && !me) showMapNote(geoMessage(FOLLOW_WAIT));
+    renderPlate();
+  }, { enableHighAccuracy: true, maximumAge: 30000, timeout: 20000 });
+}
+/* ---------- Map that shrinks while scrolling ----------
+   While the day 1 heading is below the map, nothing changes. Once it reaches the map, the map's
+   bottom edge follows the heading down to MAP_MIN; from then on the heading sticks. The camera
+   does not follow the scroll: it only moves on a tap on a stop (in the list or on the map) or
+   on the map buttons. */
+const MAP_MIN = 128; /* px: still shows the stop pin and a bit of its surroundings */
+const mapEl = document.getElementById("map");
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let mapFull = 0, collapsed = false, syncQueued = false;
+
+/* Measured again only when the width changes (rotation, window resize). The mobile address bar
+   showing or hiding changes only the height, and re-measuring then would make the map and the
+   list jump in the middle of a scroll. */
+let measuredWidth = 0;
+function measureMapFull() {
+  if (innerWidth === measuredWidth) return;
+  measuredWidth = innerWidth;
+  mapFull = Math.max(240, Math.round(innerHeight * 0.42));
+  document.documentElement.style.setProperty("--map-full", mapFull + "px");
+}
+function queueSync() {
+  if (syncQueued) return;
+  syncQueued = true;
+  requestAnimationFrame(syncMap);
+}
+/* Collapses the attribution into the (i) button, as MapLibre does on drag. Open, it covers much
+   of the shrunk map; the (i) still opens the text. */
+function collapseAttribution() {
+  const attrib = mapEl.querySelector(".maplibregl-ctrl-attrib.maplibregl-compact");
+  if (attrib) { attrib.classList.remove("maplibregl-compact-show"); attrib.removeAttribute("open"); }
+}
+function syncMap() {
+  syncQueued = false;
+  const first = document.querySelector("#days .day");
+  if (!first) return;
+  /* Where the day 1 heading would be if it did not stick (section top plus the padding above
+     it), measured from the top of the map, which is fixed */
+  const natural = first.getBoundingClientRect().top + parseFloat(getComputedStyle(first).paddingTop) - mapEl.getBoundingClientRect().top;
+  const h = Math.round(Math.min(mapFull, Math.max(MAP_MIN, natural)));
+  document.documentElement.style.setProperty("--map-h", h + "px");
+  const wasCollapsed = collapsed;
+  collapsed = h < mapFull;
+  mapEl.classList.toggle("collapsed", collapsed);
+  if (collapsed && !wasCollapsed) collapseAttribution();
+}
+/* Pin tap: scrolls the list until the stop sits just below the stuck heading */
+function scrollStopToLine(id) {
+  const li = document.getElementById("stop-" + id), h2 = document.querySelector("#days .day > h2");
+  if (!li || !h2) return;
+  const top = scrollY + li.getBoundingClientRect().top - mapEl.getBoundingClientRect().top - (MAP_MIN + h2.offsetHeight + 8);
+  scrollTo({ top, behavior: reduceMotion ? "auto" : "smooth" });
+}
+measureMapFull();
+addEventListener("scroll", queueSync, { passive: true });
+addEventListener("resize", () => { measureMapFull(); queueSync(); });
+$("#setupBox").addEventListener("toggle", queueSync);
+
+/* Average speed the plan assumes on the leg to the next stop */
+function plannedSpeed(n) {
+  const list = STOPS.filter((s) => s.day === n.day);
+  const idx = list.indexOf(n);
+  const prev = list.slice(0, idx).reverse().find((s) => s.depart || s.arrive) || list[0];
+  const from = planMin(prev, prev.depart ? "depart" : "arrive"), to = planMin(n, "arrive");
+  const a = nearestOnRoute(prev.lng, prev.lat).i, b = nearestOnRoute(n.lng, n.lat).i;
+  const km = routeIndex.cum[b] - routeIndex.cum[a];
+  return to > from && km > 0 ? km / (to - from) : 70 / 60; /* km por minuto */
+}
+function offlineEta(n) {
+  if (!routeIndex || routeIndex.coords.length < 50) return null; /* only with the real route */
+  const here = nearestOnRoute(me.lng, me.lat);
+  if (here.offKm > 15) return null; /* far from the route, the estimate is useless */
+  const target = nearestOnRoute(n.lng, n.lat);
+  const km = Math.max(0, routeIndex.cum[target.i] - routeIndex.cum[here.i]);
+  return { stopId: n.id, at: new Date(Date.now() + km / plannedSpeed(n) * 60000), offline: true, km: Math.round(km) };
+}
+async function refreshEta() {
+  const n = nextStop();
+  if (!me || !n || Date.now() - lastEtaFetch < 90000) return;
+  lastEtaFetch = Date.now();
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const url = "https://router.project-osrm.org/route/v1/driving/" + me.lng + "," + me.lat + ";" + n.lng + "," + n.lat + "?overview=false";
+    const j = await (await fetch(url, { signal: ctrl.signal })).json();
+    clearTimeout(timer);
+    if (j.routes && j.routes[0]) {
+      eta = { stopId: n.id, at: new Date(Date.now() + j.routes[0].duration * 1000), km: Math.round(j.routes[0].distance / 1000) };
+      renderPlate();
+      return;
+    }
+  } catch (e) { /* no signal: fall back to the estimate */ }
+  eta = offlineEta(n);
+  renderPlate();
+}
+
+/* ---------- Offline use ---------- */
+const MAP_CACHE = "copiloto-marau-map";
+const FONTS_CSS = "https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap";
+let downloading = false;
+
+function tileXY(lng, lat, z) {
+  const n = 2 ** z, r = lat * Math.PI / 180;
+  return [(lng + 180) / 360 * n, (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n];
+}
+/* Strip along the route: 1 tile of margin up to zoom 12, only the line at 13,
+   and the surroundings of the stops at 13 and 14 */
+function routeTiles() {
+  const coords = routeIndex.coords, out = new Set();
+  const add = (z, x, y) => out.add(z + "/" + x + "/" + y);
+  [[5, 1], [6, 1], [7, 1], [8, 1], [9, 1], [10, 1], [11, 1], [12, 1], [13, 0]].forEach(([z, buf]) => {
+    for (let i = 1; i < coords.length; i++) {
+      const [x0, y0] = tileXY(coords[i - 1][0], coords[i - 1][1], z);
+      const [x1, y1] = tileXY(coords[i][0], coords[i][1], z);
+      const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 3));
+      for (let k = 0; k <= steps; k++) {
+        const x = Math.floor(x0 + (x1 - x0) * k / steps), y = Math.floor(y0 + (y1 - y0) * k / steps);
+        for (let dx = -buf; dx <= buf; dx++) for (let dy = -buf; dy <= buf; dy++) add(z, x + dx, y + dy);
+      }
+    }
+  });
+  [13, 14].forEach((z) => STOPS.forEach((s) => {
+    const [x, y] = tileXY(s.lng, s.lat, z).map(Math.floor);
+    for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) add(z, x + dx, y + dy);
+  }));
+  return [...out];
+}
+/* Everything both styles need besides the tiles: style, tilejson, icons and labels */
+async function styleAssets(cache, styleUrl) {
+  const urls = new Set([styleUrl]);
+  const style = await (await fetchInto(cache, styleUrl)).json();
+  let tileTemplate = null;
+  for (const src of Object.values(style.sources || {})) {
+    if (src.type !== "vector" || !src.url) continue;
+    urls.add(src.url);
+    const tj = await (await fetchInto(cache, src.url)).json();
+    if (tj.tiles && tj.tiles[0]) tileTemplate = tj.tiles[0];
+  }
+  [].concat(style.sprite || []).forEach((sp) => {
+    const base = typeof sp === "string" ? sp : sp.url;
+    ["", "@2x"].forEach((r) => { urls.add(base + r + ".json"); urls.add(base + r + ".png"); });
+  });
+  const stacks = new Set();
+  (style.layers || []).forEach((l) => {
+    const f = l.layout && l.layout["text-font"];
+    if (Array.isArray(f) && f.every((x) => typeof x === "string")) stacks.add(f.join(","));
+  });
+  stacks.forEach((st) => ["0-255", "256-511", "8192-8447"].forEach((range) =>
+    urls.add(style.glyphs.replace("{fontstack}", encodeURI(st)).replace("{range}", range))));
+  return { urls: [...urls], tileTemplate };
+}
+async function fetchInto(cache, url) {
+  const hit = await cache.match(url, { ignoreVary: true });
+  if (hit) return hit;
+  const r = await fetch(url);
+  if (r.ok) await cache.put(url, r.clone());
+  return r;
+}
+async function downloadOffline() {
+  if (downloading || !routeIndex) return;
+  if (!("caches" in window)) { setOfflineMsg("Este navegador não permite guardar o mapa."); return; }
+  downloading = true;
+  const btn = $("#offlineBtn"), bar = $("#offlineBar");
+  btn.disabled = true;
+  bar.hidden = false;
+  try {
+    if (navigator.storage && navigator.storage.persist) await navigator.storage.persist();
+    const cache = await caches.open(MAP_CACHE);
+    setOfflineMsg("Preparando a lista do que baixar…");
+    const day = await styleAssets(cache, LIBERTY);
+    const night = await styleAssets(cache, FIORD);
+    const template = day.tileTemplate || night.tileTemplate;
+    const tiles = template ? routeTiles().map((t) => {
+      const [z, x, y] = t.split("/");
+      return template.replace("{z}", z).replace("{x}", x).replace("{y}", y);
+    }) : [];
+    /* The page fonts, so the text does not change without signal */
+    try {
+      const css = await (await fetchInto(cache, FONTS_CSS)).text();
+      for (const m of css.matchAll(/url\((https:[^)]+)\)/g)) await fetchInto(cache, m[1]).catch(() => null);
+    } catch (e) {}
+    const queue = [...new Set([...day.urls, ...night.urls]), ...tiles];
+    let doneCount = 0, failed = 0;
+    /* Few requests at a time, so as not to overload the free map server */
+    const worker = async () => {
+      while (queue.length) {
+        const url = queue.shift();
+        try { const r = await fetchInto(cache, url); if (!r.ok) failed++; } catch (e) { failed++; }
+        doneCount++;
+        if (doneCount % 20 === 0 || !queue.length) {
+          bar.value = doneCount / (doneCount + queue.length);
+          setOfflineMsg("Baixando o mapa da rota: " + doneCount + " de " + (doneCount + queue.length) + "…");
+        }
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    store.set("offline", JSON.stringify({ at: Date.now(), count: doneCount, failed }));
+  } catch (e) {
+    setOfflineMsg("O download parou. Com sinal, toque de novo: o que já veio fica guardado.");
+    downloading = false; btn.disabled = false; bar.hidden = true;
+    return;
+  }
+  downloading = false; btn.disabled = false; bar.hidden = true;
+  renderOffline();
+}
+function setOfflineMsg(t) { $("#offlineMsg").textContent = t; }
+async function renderOffline() {
+  if (downloading) return;
+  const info = JSON.parse(store.get("offline") || "null");
+  const parts = [];
+  if (info) {
+    const when = new Date(info.at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+    parts.push("Mapa da rota guardado em " + when + " (" + info.count + " arquivos" + (info.failed ? ", " + info.failed + " falharam: baixe de novo com sinal" : "") + ").");
+    $("#offlineBtn").textContent = "Baixar de novo";
+  } else {
+    parts.push("O mapa ainda não foi baixado. Façam isso com Wi-Fi antes de sair: são uns 3 mil arquivos, algo entre 30 e 80 MB.");
+  }
+  try {
+    if (navigator.storage && navigator.storage.estimate) {
+      const est = await navigator.storage.estimate();
+      parts.push("Em uso pela página: " + Math.round((est.usage || 0) / 1048576) + " MB.");
+    }
+    if (navigator.storage && navigator.storage.persisted) {
+      parts.push(await navigator.storage.persisted()
+        ? "O Chrome não vai apagar esses dados por falta de espaço."
+        : "O Chrome ainda pode apagar esses dados se faltar espaço. Adicionar a página à tela inicial ajuda.");
+    }
+  } catch (e) {}
+  if (!("serviceWorker" in navigator) || !navigator.serviceWorker.controller) {
+    parts.push("O modo sem internet ainda está sendo ativado. Se este aviso não sumir, recarregue a página com sinal.");
+  }
+  setOfflineMsg(parts.join(" "));
+}
+function renderConnection() {
+  $("#netBadge").hidden = navigator.onLine;
+}
+
+/* Controls: every change goes into the URL and is saved */
+function syncUrl() {
+  const q = new URLSearchParams();
+  Object.keys(DEFAULTS).forEach((k) => { if (P[k] && P[k] !== DEFAULTS[k]) q.set(k, P[k]); });
+  const s = q.toString();
+  /* In isolated viewers (iframe, local file) the browser may refuse to change the URL */
+  try { history.replaceState(null, "", location.pathname + (s ? "?" + s : "") + location.hash); } catch (e) {}
+}
+Object.keys(DEFAULTS).forEach((k) => {
+  const input = $("#p-" + k);
+  input.value = P[k];
+  input.addEventListener("change", () => {
+    if (!input.value && k !== "data") { input.value = P[k]; return; }
+    P[k] = input.value;
+    store.set(k, P[k]);
+    syncUrl(); eta = null; renderAll();
+  });
+});
+$("#resetBtn").addEventListener("click", () => { done = new Set(); store.set("done", "[]"); eta = null; lastEtaFetch = 0; renderAll(); updatePins(); refreshEta(); });
+$("#followBtn").addEventListener("click", () => setFollow(!follow));
+$("#fitBtn").addEventListener("click", () => { setFollow(false); map && map.fitBounds(BOUNDS, FIT); });
+setInterval(() => { refreshEta(); renderAll(); }, 60000);
+
+syncUrl();
+renderAll();
+$("#setupBox").open = !P.data || [1, 2].some((d) => validateDay(d).level === "err");
+$("#setupDone").addEventListener("click", () => {
+  if (!P.data) { $("#p-data").focus(); return; }
+  $("#setupBox").open = false;
+  $("#setupBox summary").focus();
+});
+initMap();
+loadRoute();
+startGeo();
+renderConnection();
+window.addEventListener("online", () => { renderConnection(); lastEtaFetch = 0; refreshEta(); });
+window.addEventListener("offline", renderConnection);
+$("#offlineBtn").addEventListener("click", downloadOffline);
+/* Registers only where the browser allows it (GitHub Pages, localhost); ignored in isolated viewers */
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+  navigator.serviceWorker.register("sw.js").then(() => navigator.serviceWorker.ready).then(renderOffline).catch(() => {});
+  navigator.serviceWorker.addEventListener("controllerchange", renderOffline);
+}
+</script>
+</body>
+</html>
