@@ -6,7 +6,7 @@
    - MAP: OpenFreeMap style, tiles, labels and icons. No version, so the downloaded map survives
      page updates. */
 
-const VERSION = "v13";
+const VERSION = "v14";
 const SHELL = "marau-shell-" + VERSION;
 const MAP = "marau-map";
 

@@ -88,6 +88,15 @@ html.map-only #map .map-tools, html.map-only #map .map-note { opacity: 1; visibi
 #followBtn[aria-pressed="false"] .dot, .map-expand[aria-pressed="true"] .ico-max,
 .map-expand[aria-pressed="false"] .ico-min { display: none; }
 .map-tools button[aria-pressed="true"] { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
+/* Map download: the download icon, a ring that fills while downloading, a check once saved */
+#offlineBtn { position: relative; }
+#offlineBtn:disabled { cursor: progress; }
+#offlineBtn .ico-saved, #offlineBtn .ring, #offlineBtn[data-state="saved"] .ico-download { display: none; }
+#offlineBtn[data-state="saved"] .ico-saved, #offlineBtn[data-state="busy"] .ring { display: block; }
+#offlineBtn[data-state="busy"] .ico-download { width: 18px; height: 18px; opacity: .55; }
+#offlineBtn .ring { position: absolute; inset: 3px; width: auto; height: auto; transform: rotate(-90deg); }
+#offlineBtn .ring circle { fill: none; stroke: var(--line); stroke-width: 3; }
+#offlineBtn .ring .ring-done { stroke: var(--primary); stroke-dasharray: 1; stroke-dashoffset: 1; }
 /* Content always starts below the full map, even while the map is shrunk */
 /* Room for the Android gesture bar at the end of the page. The static max inset, never the live
    safe-area-inset-bottom: padding on the live value makes Chrome keep its bottom bar (the chin)
@@ -205,11 +214,6 @@ ol.stops::before { content: ""; position: absolute; left: 75.5px; top: 10px; bot
 
 .net-badge { align-self: center; font-family: var(--narrow); font-weight: 700; font-size: 14px; color: var(--on-track); background: var(--track); border-radius: var(--radius); padding: 2px 8px; }
 .net-badge[hidden] { display: none; }
-.offline { margin-top: 28px; }
-.offline p { margin: 4px 0 10px; color: var(--muted); font-size: 15px; }
-.offline progress { width: 100%; height: 8px; margin-bottom: 10px; accent-color: var(--primary); }
-.offline progress[hidden] { display: none; }
-.btn:disabled { opacity: .6; cursor: progress; }
 footer { border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; margin-top: 32px; padding-top: 12px; }
 
 /* Emergency: fixed in the corner, above the map, also with the map expanded. Opens three calls. */
@@ -243,8 +247,11 @@ footer a { color: inherit; }
 <body>
 <div id="map" role="region" aria-label="Mapa da viagem">
   <!-- Lucide icons (ISC). The label lives in aria-label and title; the follow dot and the
-       expand corners switch with aria-pressed in CSS. -->
+       expand corners switch with aria-pressed in CSS, the download icons with data-state. -->
   <div class="map-tools">
+    <button type="button" id="offlineBtn" data-state="idle" aria-label="Baixar mapa da rota" title="Baixar mapa da rota">
+      <svg class="ico-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg><svg class="ico-saved" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><svg class="ring" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" pathLength="1"/><circle class="ring-done" cx="20" cy="20" r="18" pathLength="1"/></svg>
+    </button>
     <button type="button" id="followBtn" aria-pressed="false" aria-label="Seguir minha posição" title="Seguir minha posição">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="2" x2="5" y1="12" y2="12"/><line x1="19" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="5"/><line x1="12" x2="12" y1="19" y2="22"/><circle cx="12" cy="12" r="7"/><circle class="dot" cx="12" cy="12" r="3" fill="currentColor"/></svg>
     </button>
@@ -303,13 +310,6 @@ footer a { color: inherit; }
     </details>
 
     <div id="days"></div>
-
-    <section class="offline" aria-labelledby="offlineTitle">
-      <h2 id="offlineTitle">Sem internet</h2>
-      <p id="offlineMsg" aria-live="polite"></p>
-      <progress id="offlineBar" max="1" value="0" hidden></progress>
-      <button class="btn primary" id="offlineBtn" type="button">Baixar mapa da rota</button>
-    </section>
 
     <footer>
       Mapa © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, base <a href="https://openfreemap.org">OpenFreeMap</a>.
@@ -940,10 +940,14 @@ function geoMessage(waiting) {
   if (geoError) return "Ainda sem localização. Confira se o GPS está ligado.";
   return waiting;
 }
-function showMapNote(text) {
+/* One note on the map, shared by the location and the map download: each clears only its own */
+let noteOwner = "";
+function showMapNote(text, owner = "geo") {
+  if (!text && owner !== noteOwner) return;
   const note = $("#mapNote");
   note.textContent = text;
   note.hidden = !text;
+  noteOwner = text ? owner : "";
 }
 function startGeo() {
   if (!("geolocation" in navigator)) { renderPlate(); return; }
@@ -1147,17 +1151,32 @@ async function fetchInto(cache, url) {
   if (r.ok) await cache.put(url, r.clone());
   return r;
 }
+let downloadArmedUntil = 0;
 async function downloadOffline() {
   if (downloading || !routeIndex) return;
-  if (!("caches" in window)) { setOfflineMsg("Este navegador não permite guardar o mapa."); return; }
+  if (!("caches" in window)) {
+    offlineNote(window.isSecureContext ? "Este navegador não permite guardar o mapa."
+      : "Só dá para guardar o mapa em endereço seguro (https).");
+    return;
+  }
+  /* On mobile data the first tap only warns, since the map is tens of megabytes; a second tap
+     within 10 s downloads */
+  const cellular = navigator.connection && navigator.connection.type === "cellular";
+  if (cellular && !store.get("offline") && Date.now() > downloadArmedUntil) {
+    downloadArmedUntil = Date.now() + 10000;
+    offlineNote("Nos dados móveis, o mapa gasta de 30 a 80 MB. Toque de novo para baixar.");
+    return;
+  }
+  downloadArmedUntil = 0;
+  showMapNote("", "offline");
   downloading = true;
-  const btn = $("#offlineBtn"), bar = $("#offlineBar");
+  const btn = $("#offlineBtn"), ring = btn.querySelector(".ring-done");
   btn.disabled = true;
-  bar.hidden = false;
+  ring.style.strokeDashoffset = "1";
+  setOfflineButton("busy", "Preparando o download do mapa…");
   try {
     if (navigator.storage && navigator.storage.persist) await navigator.storage.persist();
     const cache = await caches.open(MAP_CACHE);
-    setOfflineMsg("Preparando a lista do que baixar…");
     const day = await styleAssets(cache, LIBERTY);
     const night = await styleAssets(cache, FIORD);
     const template = day.tileTemplate || night.tileTemplate;
@@ -1179,48 +1198,49 @@ async function downloadOffline() {
         try { const r = await fetchInto(cache, url); if (!r.ok) failed++; } catch (e) { failed++; }
         doneCount++;
         if (doneCount % 20 === 0 || !queue.length) {
-          bar.value = doneCount / (doneCount + queue.length);
-          setOfflineMsg("Baixando o mapa da rota: " + doneCount + " de " + (doneCount + queue.length) + "…");
+          const total = doneCount + queue.length;
+          ring.style.strokeDashoffset = String(1 - doneCount / total);
+          setOfflineButton("busy", "Baixando o mapa da rota: " + doneCount + " de " + total);
         }
       }
     };
     await Promise.all([worker(), worker(), worker(), worker()]);
     store.set("offline", JSON.stringify({ at: Date.now(), count: doneCount, failed }));
+    if (failed) offlineNote(failed + " arquivos falharam. Toque de novo com sinal.");
+    else if (!("serviceWorker" in navigator) || !navigator.serviceWorker.controller) {
+      offlineNote("Mapa guardado, mas o modo sem internet ainda não está ativo. Recarregue a página com sinal.");
+    }
   } catch (e) {
-    setOfflineMsg("O download parou. Com sinal, toque de novo: o que já veio fica guardado.");
-    downloading = false; btn.disabled = false; bar.hidden = true;
-    return;
+    offlineNote("O download parou. Com sinal, toque de novo: o que já veio fica guardado.");
   }
-  downloading = false; btn.disabled = false; bar.hidden = true;
+  downloading = false;
+  btn.disabled = false;
   renderOffline();
 }
-function setOfflineMsg(t) { $("#offlineMsg").textContent = t; }
-async function renderOffline() {
+/* Download messages go in the map note and clear themselves after 10 s */
+let offlineNoteTimer = 0;
+function offlineNote(text) {
+  showMapNote(text, "offline");
+  clearTimeout(offlineNoteTimer);
+  offlineNoteTimer = setTimeout(() => showMapNote("", "offline"), 10000);
+}
+function setOfflineButton(state, label) {
+  const btn = $("#offlineBtn");
+  btn.dataset.state = state;
+  btn.setAttribute("aria-label", label);
+  btn.title = label;
+}
+/* The button tells the state: a check once the map is saved, the download icon otherwise */
+function renderOffline() {
   if (downloading) return;
   const info = JSON.parse(store.get("offline") || "null");
-  const parts = [];
-  if (info) {
-    const when = new Date(info.at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-    parts.push("Mapa da rota guardado em " + when + " (" + info.count + " arquivos" + (info.failed ? ", " + info.failed + " falharam: baixe de novo com sinal" : "") + ").");
-    $("#offlineBtn").textContent = "Baixar de novo";
+  if (!info) { setOfflineButton("idle", "Baixar mapa da rota"); return; }
+  const when = new Date(info.at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  if (info.failed) {
+    setOfflineButton("idle", "Mapa guardado em " + when + ", mas " + info.failed + " arquivos falharam. Toque para baixar de novo.");
   } else {
-    parts.push("O mapa ainda não foi baixado. Façam isso com Wi-Fi antes de sair: são uns 3 mil arquivos, algo entre 30 e 80 MB.");
+    setOfflineButton("saved", "Mapa guardado em " + when + ". Toque para baixar de novo.");
   }
-  try {
-    if (navigator.storage && navigator.storage.estimate) {
-      const est = await navigator.storage.estimate();
-      parts.push("Em uso pela página: " + Math.round((est.usage || 0) / 1048576) + " MB.");
-    }
-    if (navigator.storage && navigator.storage.persisted) {
-      parts.push(await navigator.storage.persisted()
-        ? "O Chrome não vai apagar esses dados por falta de espaço."
-        : "O Chrome ainda pode apagar esses dados se faltar espaço. Adicionar a página à tela inicial ajuda.");
-    }
-  } catch (e) {}
-  if (!("serviceWorker" in navigator) || !navigator.serviceWorker.controller) {
-    parts.push("O modo sem internet ainda está sendo ativado. Se este aviso não sumir, recarregue a página com sinal.");
-  }
-  setOfflineMsg(parts.join(" "));
 }
 function renderConnection() {
   $("#netBadge").hidden = navigator.onLine;
