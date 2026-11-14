@@ -209,7 +209,7 @@ footer { border-top: 1px solid var(--line); color: var(--muted); font-size: 14px
 /* Emergency: fixed in the corner, above the map, also with the map expanded. Opens three calls. */
 .sos { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5; }
 html.map-only .sos { bottom: calc(56px + env(safe-area-inset-bottom, 0px)); } /* above the attribution (i) */
-.sos summary { list-style: none; cursor: pointer; display: grid; place-items: center; width: 56px; height: 56px; background: var(--track); color: #fff; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+.sos summary { list-style: none; cursor: pointer; display: grid; place-items: center; width: 56px; height: 56px; background: var(--track); color: var(--on-track); border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
 .sos summary::-webkit-details-marker { display: none; }
 .sos summary svg { width: 26px; height: 26px; }
 .sos .ico-close, .sos[open] .ico-phone { display: none; }
