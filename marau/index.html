@@ -45,7 +45,6 @@
   --sign: #F5C518; --sign-ink: #1E1B12;
   box-sizing: border-box;
   padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 *, *::before, *::after { box-sizing: inherit; }
 /* The document scrolls, not an inner box: a full-screen scrolling <main> made mobile Chrome hide
@@ -73,7 +72,11 @@ a { color: var(--primary); }
    It stays visible when the map is shrunk too. */
 .map-expand { position: absolute; left: 10px; bottom: 10px; z-index: 10; }
 .map-expand[aria-pressed="true"] { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
-html.map-only #map { height: auto; bottom: env(safe-area-inset-bottom, 0px); }
+/* The full-screen map runs under the gesture bar; its bottom controls stay above it */
+html.map-only #map { height: auto; bottom: 0; }
+html.map-only .map-expand { bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); }
+html.map-only #map .maplibregl-ctrl-bottom-left, html.map-only #map .maplibregl-ctrl-bottom-right {
+  bottom: env(safe-area-inset-bottom, 0px); }
 html.map-only #map .map-tools, html.map-only #map .map-note { opacity: 1; visibility: visible; }
 /* Icon buttons over the map: a 44px touch target, with a shadow so they float above the tiles */
 .map-tools button, .map-expand {
@@ -86,7 +89,10 @@ html.map-only #map .map-tools, html.map-only #map .map-note { opacity: 1; visibi
 .map-expand[aria-pressed="false"] .ico-min { display: none; }
 .map-tools button[aria-pressed="true"] { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
 /* Content always starts below the full map, even while the map is shrunk */
-main { padding: 0 16px 40px; }
+/* Room for the Android gesture bar at the end of the page. The static max inset, never the live
+   safe-area-inset-bottom: padding on the live value makes Chrome keep its bottom bar (the chin)
+   over the gesture area instead of letting the page show through. */
+main { padding: 0 16px calc(40px + env(safe-area-max-inset-bottom, 0px)); }
 .wrap { max-width: 640px; margin: 0 auto; padding-top: calc(var(--map-full) + 16px); }
 
 /* Header with the theme switch, same geometry as the roadbook */
@@ -207,8 +213,8 @@ ol.stops::before { content: ""; position: absolute; left: 75.5px; top: 10px; bot
 footer { border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; margin-top: 32px; padding-top: 12px; }
 
 /* Emergency: fixed in the corner, above the map, also with the map expanded. Opens three calls. */
-.sos { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5; }
-html.map-only .sos { bottom: calc(56px + env(safe-area-inset-bottom, 0px)); } /* above the attribution (i) */
+.sos { position: fixed; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 5; }
+html.map-only .sos { bottom: calc(env(safe-area-inset-bottom, 0px) + 56px); } /* above the attribution (i) */
 .sos summary { list-style: none; cursor: pointer; display: grid; place-items: center; width: 56px; height: 56px; background: var(--track); color: var(--on-track); border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
 .sos summary::-webkit-details-marker { display: none; }
 .sos summary svg { width: 26px; height: 26px; }
