@@ -6,8 +6,13 @@
 <title>Roadbook</title>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css"
-      integrity="sha256-qx5w1Z7EBGW65+cDDaLzzPKBM/1QLmK9WY7vut/XpzI=" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.18.0/dist/maplibre-gl.css"
+      integrity="sha256-qQeYoZUwF3kOWQ9+G9Nf8QOopCY5cstHKQt4rfhvjCA=" crossorigin="anonymous">
+<!-- MapLibre 6 ships as an ES module only; the page script loads it with import(). This map
+     pins its hash, as the integrity attributes do for the other files. -->
+<script type="importmap">
+{ "integrity": { "https://cdn.jsdelivr.net/npm/maplibre-gl@6.18.0/dist/maplibre-gl.mjs": "sha256-HgpohEBBrsZiGhDUclyZcMOxnPfhYF2YsB28mT4QWLI=" } }
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
@@ -338,8 +343,6 @@
 
 </main>
 
-<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"
-        integrity="sha256-RamwepGJzlYFTGIKlHzPQeKR5YyV6bYVM7dAqqZe5cs=" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/lucide@1.47.0/dist/umd/lucide.min.js"
         integrity="sha256-wykep1f/PaD8RaQdP/YNYdqbJXMUlixc3e2Uyg3wXXo=" crossorigin="anonymous"></script>
 
@@ -347,6 +350,10 @@
 /* Plain JavaScript on purpose. Pico styles the page, Lucide draws the icons,
    MapLibre draws the maps on OpenFreeMap basemaps, the same version as the trip page.
    Nothing here needs a framework. */
+
+/* MapLibre 6 is an ES module: loaded here, in the background, while the page builds. Resolves
+   to the library, or to null when it can't load (no signal and no copy, or a wrong hash). */
+const mapLibrary = import("https://cdn.jsdelivr.net/npm/maplibre-gl@6.18.0/dist/maplibre-gl.mjs").then(lib => (window.maplibregl = lib), () => null);
 
 const OSRM = "https://router.project-osrm.org/route/v1/driving/";
 
@@ -604,7 +611,7 @@ function buildRoute(article) {
     const t = theme();
     if (t === mapTheme) return;
     mapTheme = t;
-    basemapStyle(t).then(style => {
+    Promise.all([basemapStyle(t), mapLibrary]).then(([style]) => {
       if (t !== mapTheme) return; // the theme flipped again while this loaded
       if (!map) return makeMap(style);
       styleReady = false;

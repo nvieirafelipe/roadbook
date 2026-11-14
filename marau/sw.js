@@ -6,15 +6,17 @@
    - MAP: OpenFreeMap style, tiles, labels and icons. No version, so the downloaded map survives
      page updates. */
 
-const VERSION = "v15";
+const VERSION = "v16";
 const SHELL = "marau-shell-" + VERSION;
 const MAP = "marau-map";
 
 const PRECACHE = [
   "./",
   "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "icon-180.png",
-  "https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js",
-  "https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css",
+  "https://cdn.jsdelivr.net/npm/maplibre-gl@6.18.0/dist/maplibre-gl.mjs",
+  /* The library starts its worker from this exact address, query included */
+  "https://cdn.jsdelivr.net/npm/maplibre-gl@6.18.0/dist/maplibre-gl-worker.mjs?v=6.18.0",
+  "https://cdn.jsdelivr.net/npm/maplibre-gl@6.18.0/dist/maplibre-gl.css",
   "https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap"
 ];
 

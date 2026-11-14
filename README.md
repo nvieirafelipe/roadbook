@@ -94,6 +94,7 @@ into its own file and load it on demand — htmx would earn its place then, not 
   in the app. Maps treats every via as a stop, with its own arrival prompt.
 - OpenFreeMap's public instance is free, with no keys and no request limits. Styles,
   tiles and fonts all come from it, as does the attribution it requires.
-- MapLibre adds about 275 KB (gzipped) of JavaScript to the page.
+- MapLibre adds about 440 KB (gzipped) of JavaScript: the library and its worker, two ES
+  modules since version 6.
 - The OSRM demo server is public and unguaranteed. If it goes down the page draws
   straight lines between stops and says so, rather than showing a wrong number.

@@ -12,8 +12,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet"
-      integrity="sha256-qx5w1Z7EBGW65+cDDaLzzPKBM/1QLmK9WY7vut/XpzI=" crossorigin="anonymous">
+<link href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.18.0/dist/maplibre-gl.css" rel="stylesheet"
+      integrity="sha256-qQeYoZUwF3kOWQ9+G9Nf8QOopCY5cstHKQt4rfhvjCA=" crossorigin="anonymous">
+<!-- MapLibre 6 ships as an ES module only; the page script loads it with import(). This map
+     pins its hash, as the integrity attributes do for the other files. -->
+<script type="importmap">
+{ "integrity": { "https://cdn.jsdelivr.net/npm/maplibre-gl@6.18.0/dist/maplibre-gl.mjs": "sha256-HgpohEBBrsZiGhDUclyZcMOxnPfhYF2YsB28mT4QWLI=" } }
+</script>
 <style>
 /* Same palette as the roadbook: topographic sheet by day, asphalt by night. Green is kept
    for the next-stop highway sign only. */
@@ -330,9 +335,11 @@ footer a { color: inherit; }
   </div>
 </details>
 
-<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"
-        integrity="sha256-RamwepGJzlYFTGIKlHzPQeKR5YyV6bYVM7dAqqZe5cs=" crossorigin="anonymous"></script>
 <script>
+/* MapLibre 6 is an ES module: loaded here, in the background, while the page builds. Resolves
+   to the library, or to null when it can't load (no signal and no copy, or a wrong hash). */
+const mapLibrary = import("https://cdn.jsdelivr.net/npm/maplibre-gl@6.18.0/dist/maplibre-gl.mjs").then((lib) => (window.maplibregl = lib), () => null);
+
 /* Times from the original plan, leaving at 00:00 on day 1 and at 06:30 on day 2.
    Changing the departure shifts everything along with it. */
 const BASE = { 1: "00:00", 2: "06:30" };
@@ -813,7 +820,7 @@ function addRouteLayers() {
   map.addLayer({ id: "route", type: "line", source: "route", paint: { "line-color": pal.route, "line-width": 4.5 }, layout });
 }
 async function initMap() {
-  if (!window.maplibregl) { mapFailed(); return; }
+  if (!(await mapLibrary)) { mapFailed(); return; }
   try {
     map = new maplibregl.Map({
       container: "map",
