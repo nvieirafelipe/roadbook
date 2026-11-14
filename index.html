@@ -154,8 +154,22 @@
 
   .leaflet-container{font-family:inherit;background:var(--map-bg)}
   .leaflet-popup-content{font-family:inherit;margin:10px 14px}
-  /* Leaflet's zoom links carry role="button", so Pico pads them like real buttons. */
-  .leaflet-bar a[role="button"]{padding:0;border-top:0;border-left:0;border-right:0}
+  /* Zoom buttons drawn like the trip page's map buttons: separate 44px squares in the card
+     colour, with a line icon and a shadow. Leaflet's zoom links carry role="button", so Pico
+     styles them like real buttons, and sets --pico-color on them to the button ink; the icon
+     inherits the page ink from the map instead. These selectors outrank Leaflet and Pico. */
+  .leaflet-container .leaflet-bar.leaflet-control-zoom{border:0;box-shadow:none;background:none;
+    display:flex;flex-direction:column;gap:8px}
+  .leaflet-bar.leaflet-control-zoom a[role="button"]{display:grid;place-items:center;
+    width:44px;height:44px;margin:0;padding:0;line-height:normal;color:inherit;
+    background:var(--pico-card-background-color);border:1px solid var(--rule);border-radius:3px;
+    box-shadow:0 1px 4px rgba(0,0,0,.35)}
+  .leaflet-bar.leaflet-control-zoom a[role="button"]:hover{
+    background:var(--pico-card-sectioning-background-color)}
+  .leaflet-bar.leaflet-control-zoom a[role="button"]:focus-visible{
+    outline:2px solid var(--pico-primary);outline-offset:2px}
+  .leaflet-bar.leaflet-control-zoom a.leaflet-disabled[role="button"]{opacity:.45;cursor:default}
+  .leaflet-control-zoom svg{width:22px;height:22px}
 
   @media (max-width:768px){
     .body{grid-template-columns:1fr}
@@ -408,6 +422,12 @@ const PALETTE = {
   dark:  { route:"#4DB2FF", edge:"#1B1E22", track:"#EC6A55", stroke:"#EEEAE2", fill:"#25292E" }
 };
 
+/* Lucide plus and minus (ISC), inline so the zoom buttons don't wait for the icon script */
+const lineIcon = body => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+const ZOOM_IN  = lineIcon('<path d="M5 12h14"/><path d="M12 5v14"/>');
+const ZOOM_OUT = lineIcon('<path d="M5 12h14"/>');
+
 const $  = (root, sel) => (typeof root === "string" ? document : root).querySelector(typeof root === "string" ? root : sel);
 const $$ = (root, sel) => Array.from((typeof root === "string" ? document : root).querySelectorAll(typeof root === "string" ? root : sel));
 const icons = () => { if (window.lucide) lucide.createIcons(); };
@@ -530,7 +550,8 @@ function buildRoute(article) {
 
   openButton.href = mapsLink(stops, null);
 
-  const map = L.map($(article, ".map"), { scrollWheelZoom: false, maxZoom: 18 });
+  const map = L.map($(article, ".map"), { scrollWheelZoom: false, maxZoom: 18, zoomControl: false });
+  L.control.zoom({ zoomInText: ZOOM_IN, zoomOutText: ZOOM_OUT }).addTo(map);
 
   /* The map's height follows the stop list, which changes when the web fonts land.
      Leaflet only notices window resizes on its own. */
