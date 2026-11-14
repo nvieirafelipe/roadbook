@@ -247,6 +247,20 @@ footer a { color: inherit; }
 .pin.done { background: var(--card-alt); color: var(--muted); border: 1px dashed var(--rule); }
 .maplibregl-ctrl-attrib { font-family: var(--serif); }
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+/* Landscape: the map on the left at full height and the list on the right, so both stay in view.
+   The map takes the roadbook's share (1.4 : 1) but leaves the list 360 to 680px wide, and it
+   does not shrink here. The edges keep clear of a camera notch and of the gesture bar. */
+@media (orientation: landscape) and (min-width: 600px) {
+  :root { --map-w: max(min(58vw, 100vw - 360px), 100vw - 680px); }
+  #map { bottom: 0; right: auto; width: var(--map-w); height: auto; border-bottom: 0; border-right: 1px solid var(--line); }
+  .map-expand { left: calc(env(safe-area-inset-left, 0px) + 10px); bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); }
+  #map .maplibregl-ctrl-bottom-left, #map .maplibregl-ctrl-bottom-right { bottom: env(safe-area-inset-bottom, 0px); }
+  main { margin-left: var(--map-w); padding-right: calc(env(safe-area-inset-right, 0px) + 16px); }
+  .wrap { padding-top: 16px; }
+  .day > h2 { top: env(safe-area-inset-top, 0px); }
+  .sos { right: calc(env(safe-area-inset-right, 0px) + 16px); }
+  html.map-only #map { right: 0; width: auto; border-right: 0; }
+}
 @media (prefers-reduced-motion: reduce) { * { transition-duration: .01ms !important; } }
 </style>
 </head>
@@ -982,10 +996,13 @@ const MAP_MIN = 128; /* px: still shows the stop pin and a bit of its surroundin
 const mainEl = document.querySelector("main"), mapEl = document.getElementById("map");
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 let mapFull = 0, collapsed = false, syncQueued = false;
-/* Tablets and desktops keep the map at full height; only phones shrink it while scrolling.
-   A phone in landscape is wide but short, so it still shrinks. */
+/* Tablets in portrait keep the map at full height; only phones in portrait shrink it while
+   scrolling. In landscape the map sits beside the list (CSS) and keeps its size. */
 const wideScreen = matchMedia("(min-width: 768px) and (min-height: 600px)");
+const sideBySide = matchMedia("(orientation: landscape) and (min-width: 600px)");
 function mapMin() { return wideScreen.matches ? mapFull : MAP_MIN; }
+/* Height the map takes above the list once shrunk; none when it sits beside the list */
+function mapAboveList() { return sideBySide.matches ? 0 : mapMin(); }
 
 /* Measured again only when the width changes (rotation, window resize). The mobile address bar
    showing or hiding changes only the height, and re-measuring then would make the map and the
@@ -1010,6 +1027,11 @@ function collapseAttribution() {
 }
 function syncMap() {
   syncQueued = false;
+  if (sideBySide.matches) { /* beside the list: full height, buttons always shown */
+    collapsed = false;
+    mapEl.classList.remove("collapsed");
+    return;
+  }
   const first = document.querySelector("#days .day");
   if (!first) return;
   /* Where the day 1 heading would be if it did not stick (section top plus the padding above
@@ -1026,13 +1048,14 @@ function syncMap() {
 function scrollStopToLine(id) {
   const li = document.getElementById("stop-" + id), h2 = document.querySelector("#days .day > h2");
   if (!li || !h2) return;
-  const top = scrollY + li.getBoundingClientRect().top - mapEl.getBoundingClientRect().top - (mapMin() + h2.offsetHeight + 8);
+  const top = scrollY + li.getBoundingClientRect().top - mapEl.getBoundingClientRect().top - (mapAboveList() + h2.offsetHeight + 8);
   scrollTo({ top, behavior: reduceMotion ? "auto" : "smooth" });
 }
 measureMapFull();
 addEventListener("scroll", queueSync, { passive: true });
 addEventListener("resize", () => { measureMapFull(); queueSync(); });
 wideScreen.addEventListener("change", queueSync);
+sideBySide.addEventListener("change", queueSync);
 $("#setupBox").addEventListener("toggle", queueSync);
 
 /* ---------- Expand map ----------
