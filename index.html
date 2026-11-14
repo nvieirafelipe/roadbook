@@ -6,10 +6,8 @@
 <title>Roadbook</title>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.min.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css"
-      integrity="sha256-qx5w1Z7EBGW65+cDDaLzzPKBM/1QLmK9WY7vut/XpzI=" crossorigin="">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css"
+      integrity="sha256-qx5w1Z7EBGW65+cDDaLzzPKBM/1QLmK9WY7vut/XpzI=" crossorigin="anonymous">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
@@ -152,24 +150,30 @@
     color:var(--pico-muted-color);font-size:.9rem;max-width:64ch;display:flex;gap:.6rem}
   .colophon .lucide{width:17px;height:17px;flex-shrink:0;margin-top:.15rem}
 
-  .leaflet-container{font-family:inherit;background:var(--map-bg)}
-  .leaflet-popup-content{font-family:inherit;margin:10px 14px}
+  .maplibregl-map{font-family:inherit}
+  .maplibregl-popup-content{font-family:inherit;padding:10px 14px;color:#333}
+  /* Map dots: each stop an ink ring on the card colour; "you are here" filled in the track red.
+     A dot with a popup gets role="button" from MapLibre, so Pico pads it and paints it in the
+     button colours; these selectors outrank Pico's, and the ring takes the page ink through
+     currentColor because Pico resets --pico-color on buttons. */
+  .map .map-dot{width:14px;height:14px;margin:0;padding:0;border-radius:50%;cursor:pointer;
+    color:inherit;border:2px solid currentColor;background:var(--pico-card-background-color);
+    box-shadow:none}
+  .map .map-dot.here{width:18px;height:18px;border-color:var(--track);background:var(--track)}
+  .map .map-dot:focus-visible{outline:2px solid var(--pico-primary);outline-offset:2px}
   /* Zoom buttons drawn like the trip page's map buttons: separate 44px squares in the card
-     colour, with a line icon and a shadow. Leaflet's zoom links carry role="button", so Pico
-     styles them like real buttons, and sets --pico-color on them to the button ink; the icon
-     inherits the page ink from the map instead. These selectors outrank Leaflet and Pico. */
-  .leaflet-container .leaflet-bar.leaflet-control-zoom{border:0;box-shadow:none;background:none;
-    display:flex;flex-direction:column;gap:8px}
-  .leaflet-bar.leaflet-control-zoom a[role="button"]{display:grid;place-items:center;
-    width:44px;height:44px;margin:0;padding:0;line-height:normal;color:inherit;
-    background:var(--pico-card-background-color);border:1px solid var(--rule);border-radius:3px;
+     colour, with a line icon and a shadow. Pico styles every button and sets --pico-color on
+     it to the button ink; the icon inherits the page ink from the map instead. These
+     selectors outrank Pico's, hover and focus included. */
+  .map .zoom{display:flex;flex-direction:column;gap:8px}
+  .map .zoom button{display:grid;place-items:center;width:44px;height:44px;margin:0;padding:0;
+    line-height:normal;color:inherit;background:var(--pico-card-background-color);
+    border:1px solid var(--rule);border-radius:3px;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+  .map .zoom button:is(:hover,:focus){background:var(--pico-card-sectioning-background-color);
     box-shadow:0 1px 4px rgba(0,0,0,.35)}
-  .leaflet-bar.leaflet-control-zoom a[role="button"]:hover{
-    background:var(--pico-card-sectioning-background-color)}
-  .leaflet-bar.leaflet-control-zoom a[role="button"]:focus-visible{
-    outline:2px solid var(--pico-primary);outline-offset:2px}
-  .leaflet-bar.leaflet-control-zoom a.leaflet-disabled[role="button"]{opacity:.45;cursor:default}
-  .leaflet-control-zoom svg{width:22px;height:22px}
+  .map .zoom button:focus-visible{outline:2px solid var(--pico-primary);outline-offset:2px}
+  .map .zoom button:disabled{opacity:.45;cursor:default}
+  .map .zoom svg{width:22px;height:22px}
 
   @media (max-width:768px){
     .body{grid-template-columns:1fr}
@@ -334,17 +338,13 @@
 
 </main>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"
-        integrity="sha256-RamwepGJzlYFTGIKlHzPQeKR5YyV6bYVM7dAqqZe5cs=" crossorigin=""></script>
-<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js"
-        integrity="sha256-Hmz4yz61/ZCYeaob82o4P7UGyaWy27+rq85lopTdH8s=" crossorigin=""></script>
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"
+        integrity="sha256-RamwepGJzlYFTGIKlHzPQeKR5YyV6bYVM7dAqqZe5cs=" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/lucide@1.47.0/dist/umd/lucide.min.js"></script>
 
 <script>
 /* Plain JavaScript on purpose. Pico styles the page, Lucide draws the icons,
-   Leaflet draws the map over an OpenFreeMap basemap that MapLibre renders.
+   MapLibre draws the maps on OpenFreeMap basemaps, the same version as the trip page.
    Nothing here needs a framework. */
 
 const OSRM = "https://router.project-osrm.org/route/v1/driving/";
@@ -418,15 +418,57 @@ const basemapStyle = t => t === "light"
    map (~5:1 on both). The edge is the page colour, drawn wider underneath so the route
    stays readable where it crosses roads. */
 const PALETTE = {
-  light: { route:"#0172AD", edge:"#FDFBF4", track:"#B23A2E", stroke:"#3D3020", fill:"#FDFBF4" },
-  dark:  { route:"#4DB2FF", edge:"#1B1E22", track:"#EC6A55", stroke:"#EEEAE2", fill:"#25292E" }
+  light: { route:"#0172AD", edge:"#FDFBF4" },
+  dark:  { route:"#4DB2FF", edge:"#1B1E22" }
 };
+/* The dots take their colours from the theme in CSS (.map-dot). */
+
+const FIT = { padding: 24 };
+
+/* [lat, lon] pairs, the order the page keeps them in (and GPX writes), to MapLibre bounds */
+const boundsOf = latlngs =>
+  latlngs.reduce((b, [lat, lon]) => b.extend([lon, lat]), new maplibregl.LngLatBounds());
 
 /* Lucide plus and minus (ISC), inline so the zoom buttons don't wait for the icon script */
 const lineIcon = body => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 const ZOOM_IN  = lineIcon('<path d="M5 12h14"/><path d="M12 5v14"/>');
 const ZOOM_OUT = lineIcon('<path d="M5 12h14"/>');
+
+/* Two buttons in the top corner, styled in CSS (.zoom). Each switches off at its zoom limit. */
+class ZoomButtons {
+  onAdd(map) {
+    const box = document.createElement("div");
+    box.className = "maplibregl-ctrl zoom";
+    const button = (label, icon, zoom) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.innerHTML = icon;
+      b.setAttribute("aria-label", label);
+      b.title = label;
+      b.addEventListener("click", () => zoom.call(map));
+      box.appendChild(b);
+      return b;
+    };
+    const zoomIn = button("Zoom in", ZOOM_IN, map.zoomIn);
+    const zoomOut = button("Zoom out", ZOOM_OUT, map.zoomOut);
+    const sync = () => {
+      zoomIn.disabled = map.getZoom() >= map.getMaxZoom();
+      zoomOut.disabled = map.getZoom() <= map.getMinZoom();
+    };
+    map.on("zoom", sync);
+    sync();
+    return box;
+  }
+  onRemove() {}
+}
+
+/* On a narrow map MapLibre opens the attribution, covering a good part of it. Closed, it is
+   the (i) button, which still opens the text; the trip page does the same. */
+function collapseAttribution(container) {
+  const attrib = container.querySelector(".maplibregl-ctrl-attrib.maplibregl-compact");
+  if (attrib) { attrib.classList.remove("maplibregl-compact-show"); attrib.removeAttribute("open"); }
+}
 
 const $  = (root, sel) => (typeof root === "string" ? document : root).querySelector(typeof root === "string" ? root : sel);
 const $$ = (root, sel) => Array.from((typeof root === "string" ? document : root).querySelectorAll(typeof root === "string" ? root : sel));
@@ -550,58 +592,90 @@ function buildRoute(article) {
 
   openButton.href = mapsLink(stops, null);
 
-  const map = L.map($(article, ".map"), { scrollWheelZoom: false, maxZoom: 18, zoomControl: false });
-  L.control.zoom({ zoomInText: ZOOM_IN, zoomOutText: ZOOM_OUT }).addTo(map);
+  /* The map is optional: without MapLibre or WebGL the trip still measures, exports a GPX
+     and hands off to Google Maps. */
+  const container = $(article, ".map");
+  let map = null, mapTheme = null, styleReady = false, line = null, hereMarker = null, known = null;
 
-  /* The map's height follows the stop list, which changes when the web fonts land.
-     Leaflet only notices window resizes on its own. */
-  new ResizeObserver(() => map.invalidateSize()).observe(map.getContainer());
-
-  /* One MapLibre layer per map; a theme change swaps its style instead of stacking a
-     second WebGL map. Attribution comes from the style's own tile source. The layer only
-     builds its MapLibre map once Leaflet has a view, so a theme flip before the route
-     lands replaces the layer rather than restyling a map that doesn't exist yet. */
-  let basemap = null, basemapTheme = null;
-
-  function dressBasemap(t) {
-    if (t === basemapTheme) return;
-    basemapTheme = t;
+  /* One MapLibre map per trip, built once the first style is in hand; a theme change swaps
+     its style instead of building a second map. */
+  function dressMap() {
+    const t = theme();
+    if (t === mapTheme) return;
+    mapTheme = t;
     basemapStyle(t).then(style => {
-      if (t !== basemapTheme) return; // the theme flipped again while this loaded
-      const gl = basemap && basemap.getMaplibreMap();
-      if (gl) return gl.setStyle(style);
-      if (basemap) basemap.remove();
-      basemap = L.maplibreGL({ style }).addTo(map);
+      if (t !== mapTheme) return; // the theme flipped again while this loaded
+      if (!map) return makeMap(style);
+      styleReady = false;
+      map.setStyle(style, { diff: false });
     });
   }
 
-  const markers = stops.map(s =>
-    L.circleMarker([s.lat, s.lon], { radius: 6, weight: 2, fillOpacity: 1 })
-      .addTo(map).bindPopup(`<b>${s.name}</b>`));
-
-  let line = null, edge = null, hereMarker = null, known = null;
-
-  function dressMap() {
-    const t = theme(), c = PALETTE[t];
-    dressBasemap(t);
-    markers.forEach(m => m.setStyle({ color: c.stroke, fillColor: c.fill }));
-    if (line) { line.setStyle({ color: c.route }); edge.setStyle({ color: c.edge }); }
-    if (hereMarker) hereMarker.setStyle({ color: c.track, fillColor: c.track });
+  function makeMap(style) {
+    if (!window.maplibregl) return;
+    try {
+      map = new maplibregl.Map({
+        container, style, maxZoom: 18,
+        bounds: boundsOf(line ? line.latlngs : stops.map(s => [s.lat, s.lon])), fitBoundsOptions: FIT,
+        attributionControl: { compact: true }, // the (i) button, as on the trip page
+        /* Pans and zooms; no scroll-wheel zoom inside the page, no rotating or tilting */
+        scrollZoom: false, dragRotate: false, pitchWithRotate: false, touchPitch: false
+      });
+    } catch (e) { map = null; return; }
+    map.touchZoomRotate.disableRotation();
+    map.keyboard.disableRotation();
+    map.addControl(new ZoomButtons(), "top-left");
+    map.once("load", () => collapseAttribution(container));
+    /* Each style, the first one and every theme change, arrives without the route */
+    map.on("style.load", () => { styleReady = true; drawLine(); });
+    stops.forEach(s => addDot("stop", s, s.name));
+    if (known) placeHere();
+    /* The map's height follows the stop list, which changes when the web fonts land */
+    new ResizeObserver(() => map.resize()).observe(container);
   }
 
-  /* The route sits on a wider line in the page colour, so it stays readable where it
-     crosses roads; the markers go back on top of both. Fitting first matters: Leaflet
-     holds back every layer until the map has a view, and a held-back marker can't be
-     brought to the front. */
+  function addDot(kind, point, label) {
+    const el = document.createElement("div");
+    el.className = "map-dot " + kind;
+    const name = document.createElement("b");
+    name.textContent = label;
+    const popup = new maplibregl.Popup({ offset: kind === "here" ? 12 : 10, closeButton: false }).setDOMContent(name);
+    const marker = new maplibregl.Marker({ element: el }).setLngLat([point.lon, point.lat]).setPopup(popup).addTo(map);
+    el.setAttribute("aria-label", label); // after addTo, which labels every marker "Map marker"
+    return marker;
+  }
+
+  function placeHere() {
+    if (!map) return;
+    if (hereMarker) hereMarker.remove();
+    hereMarker = addDot("here", known, "You are here");
+  }
+
+  /* The route sits on a wider line in the page colour, so it stays readable where it crosses
+     roads. The dots are HTML markers, always above both lines. */
   function setLine(latlngs, style) {
-    if (line) { line.remove(); edge.remove(); }
-    map.fitBounds(L.latLngBounds(latlngs), { padding: [24, 24] });
+    line = Object.assign({ latlngs }, style);
+    if (!map) return;
+    map.fitBounds(boundsOf(latlngs), FIT);
+    drawLine();
+  }
+
+  function drawLine() {
+    if (!map || !line || !styleReady) return;
     const c = PALETTE[theme()];
-    edge = L.polyline(latlngs, Object.assign({}, style,
-      { color: c.edge, weight: style.weight + 4, opacity: 1 })).addTo(map);
-    line = L.polyline(latlngs, Object.assign({}, style, { color: c.route })).addTo(map);
-    markers.forEach(m => m.bringToFront());
-    if (hereMarker) hereMarker.bringToFront();
+    const data = { type: "Feature", properties: {}, geometry: { type: "LineString",
+      coordinates: line.latlngs.map(([lat, lon]) => [lon, lat]) } };
+    const source = map.getSource("route");
+    if (source) source.setData(data); else map.addSource("route", { type: "geojson", data });
+    ["route", "route-edge"].forEach(id => { if (map.getLayer(id)) map.removeLayer(id); });
+    /* Dashes are given in pixels; MapLibre counts them in line widths */
+    const dash = width => line.dash ? { "line-dasharray": line.dash.map(px => px / width) } : {};
+    const layout = { "line-cap": "round", "line-join": "round" };
+    map.addLayer({ id: "route-edge", type: "line", source: "route", layout,
+      paint: Object.assign({ "line-color": c.edge, "line-width": line.width + 4 }, dash(line.width + 4)) });
+    map.addLayer({ id: "route", type: "line", source: "route", layout,
+      paint: Object.assign({ "line-color": c.route, "line-width": line.width, "line-opacity": line.opacity },
+        dash(line.width)) });
   }
   dressMap();
   document.addEventListener("theme", dressMap);
@@ -619,7 +693,7 @@ function buildRoute(article) {
         const r = data.routes[0];
         const shape = r.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
 
-        setLine(shape, { weight: 4, opacity: 1 });
+        setLine(shape, { width: 4, opacity: 1 });
 
         const km = Math.round(r.distance / 1000);
         const hours = Math.floor(r.duration / 3600);
@@ -633,7 +707,7 @@ function buildRoute(article) {
         gpxButton.onclick = () => downloadGpx(slug, name, points, shape);
       })
       .catch(() => {
-        setLine(points.map(p => [p.lat, p.lon]), { weight: 2, opacity: .85, dashArray: "5 7" });
+        setLine(points.map(p => [p.lat, p.lon]), { width: 2, opacity: .85, dash: [5, 7] });
         distanceEl.className = "stat failed";
         distanceEl.innerHTML = '<i data-lucide="triangle-alert"></i>router unavailable';
         durationEl.hidden = true;
@@ -661,11 +735,7 @@ function buildRoute(article) {
     locate()
       .then(here => {
         known = here;
-        const c = PALETTE[theme()].track;
-        if (hereMarker) hereMarker.remove();
-        hereMarker = L.circleMarker([here.lat, here.lon],
-          { radius: 8, color: c, weight: 2, fillColor: c, fillOpacity: 1 })
-          .addTo(map).bindPopup("<b>You are here</b>");
+        placeHere();
         $$(article, "li.me").forEach(li => li.classList.add("found"));
         openButton.removeAttribute("aria-busy");
         openButton.innerHTML = label;

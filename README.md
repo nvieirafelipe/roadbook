@@ -8,9 +8,9 @@ HTML file. No API keys, no backend.
 - **Trips**: one `<article data-route>` each, with coordinates on the `<li>` elements.
   The script reads the page; there is no parallel list to keep in sync.
 - **Page script**: plain JavaScript. No framework — nothing here talks to a server.
-- **Map**: OpenFreeMap vector basemaps, drawn by MapLibre GL inside Leaflet through
-  `maplibre-gl-leaflet`. Liberty by day; Fiord at night, repainted layer by layer from
-  the night palette so the map matches the card around it. No key.
+- **Map**: OpenFreeMap vector basemaps drawn by MapLibre GL, the same version and CDN as
+  the trip page. Liberty by day; Fiord at night, repainted layer by layer from the night
+  palette so the map matches the card around it. No key.
 - **Route**: navigation blue in both themes, on a wider edge in the page colour. The
   theme's accent goes on the Google Maps button instead.
 - **Routing**: the OSRM demo server, called from the browser.
