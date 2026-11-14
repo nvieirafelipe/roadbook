@@ -57,7 +57,7 @@ body {
   background: var(--bg); color: var(--ink);
   font-family: var(--serif); font-size: 17px; line-height: 1.5;
 }
-h1, h2, .time, .btn, .actions a, .actions button, .map-tools button, .plate, .setup legend { font-family: var(--narrow); }
+h1, h2, .time, .btn, .actions a, .actions button, .plate, .setup legend { font-family: var(--narrow); }
 a { color: var(--primary); }
 
 /* Fixed layer at the top: the page scrolls underneath and the height follows the scroll (syncMap) */
@@ -67,19 +67,23 @@ a { color: var(--primary); }
 .map-tools { position: absolute; right: 10px; top: 10px; display: flex; gap: 8px; z-index: 10; transition: opacity .2s, visibility .2s; }
 /* Shrunk map: the buttons hide so they do not cover the small map, and come back with the full map */
 #map.collapsed .map-tools, #map.collapsed .map-note { opacity: 0; visibility: hidden; }
-.map-note { position: absolute; top: 56px; left: 10px; right: 10px; z-index: 10; margin: 0; padding: 6px 10px; font-size: 14px; background: var(--card); color: var(--ink); border: 1px solid var(--rule); border-left: 4px solid var(--track); border-radius: var(--radius); }
+.map-note { position: absolute; top: 62px; left: 10px; right: 10px; z-index: 10; margin: 0; padding: 6px 10px; font-size: 14px; background: var(--card); color: var(--ink); border: 1px solid var(--rule); border-left: 4px solid var(--track); border-radius: var(--radius); }
 .map-note[hidden] { display: none; }
 /* Expand map: the map fills the screen; the same button, in the bottom corner, goes back to the list.
    It stays visible when the map is shrunk too. */
-.map-expand { position: absolute; left: 10px; bottom: 10px; z-index: 10; font-family: var(--narrow); font-weight: 700; font-size: 15px; background: var(--card); color: var(--ink); border: 1px solid var(--rule); border-radius: var(--radius); padding: 7px 12px; cursor: pointer; }
+.map-expand { position: absolute; left: 10px; bottom: 10px; z-index: 10; }
 .map-expand[aria-pressed="true"] { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
 html.map-only #map { height: auto; bottom: env(safe-area-inset-bottom, 0px); }
 html.map-only #map .map-tools, html.map-only #map .map-note { opacity: 1; visibility: visible; }
-.map-tools button {
-  font-weight: 700; font-size: 15px;
+/* Icon buttons over the map: a 44px touch target, with a shadow so they float above the tiles */
+.map-tools button, .map-expand {
+  display: grid; place-items: center; width: 44px; height: 44px; padding: 0;
   background: var(--card); color: var(--ink); border: 1px solid var(--rule);
-  border-radius: var(--radius); padding: 7px 12px; cursor: pointer;
+  border-radius: var(--radius); cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.35);
 }
+.map-tools button svg, .map-expand svg { width: 22px; height: 22px; }
+#followBtn[aria-pressed="false"] .dot, .map-expand[aria-pressed="true"] .ico-max,
+.map-expand[aria-pressed="false"] .ico-min { display: none; }
 .map-tools button[aria-pressed="true"] { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
 /* Content always starts below the full map, even while the map is shrunk */
 main { padding: 0 16px 40px; }
@@ -232,12 +236,20 @@ footer a { color: inherit; }
 </head>
 <body>
 <div id="map" role="region" aria-label="Mapa da viagem">
+  <!-- Lucide icons (ISC). The label lives in aria-label and title; the follow dot and the
+       expand corners switch with aria-pressed in CSS. -->
   <div class="map-tools">
-    <button id="followBtn" aria-pressed="false">Seguir minha posição</button>
-    <button id="fitBtn">Ver viagem</button>
+    <button type="button" id="followBtn" aria-pressed="false" aria-label="Seguir minha posição" title="Seguir minha posição">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="2" x2="5" y1="12" y2="12"/><line x1="19" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="5"/><line x1="12" x2="12" y1="19" y2="22"/><circle cx="12" cy="12" r="7"/><circle class="dot" cx="12" cy="12" r="3" fill="currentColor"/></svg>
+    </button>
+    <button type="button" id="fitBtn" aria-label="Ver viagem" title="Ver viagem">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>
+    </button>
   </div>
   <p class="map-note" id="mapNote" role="status" hidden></p>
-  <button type="button" class="map-expand" id="expandBtn" aria-pressed="false">Expandir mapa</button>
+  <button type="button" class="map-expand" id="expandBtn" aria-pressed="false" aria-label="Expandir mapa" title="Expandir mapa">
+    <svg class="ico-max" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg><svg class="ico-min" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+  </button>
 </div>
 <main>
   <div class="wrap">
@@ -919,7 +931,7 @@ const FOLLOW_WAIT = "Procurando sua posição. Se o navegador pedir, permita a l
 /* Why there is no position yet. Outside https (and localhost) the browser denies location. */
 function geoMessage(waiting) {
   if (!("geolocation" in navigator)) return "Este navegador não informa a localização.";
-  if (!window.isSecureContext) return "A localização só funciona em endereço seguro (https). Por este endereço, a previsão ao vivo e o Seguir minha posição ficam desligados.";
+  if (!window.isSecureContext) return "A localização só funciona em endereço seguro (https). Por este endereço, a previsão ao vivo e o botão de seguir a posição ficam desligados.";
   if (geoError && geoError.code === 1) return "A localização está bloqueada para esta página. Libere nas permissões do navegador.";
   if (geoError) return "Ainda sem localização. Confira se o GPS está ligado.";
   return waiting;
@@ -1016,7 +1028,9 @@ function setMapOnly(on, fromHistory) {
   document.documentElement.classList.toggle("map-only", on);
   mainEl.inert = on;
   const b = $("#expandBtn");
-  b.textContent = on ? "Voltar à lista" : "Expandir mapa";
+  const label = on ? "Voltar à lista" : "Expandir mapa";
+  b.setAttribute("aria-label", label);
+  b.title = label;
   b.setAttribute("aria-pressed", String(on));
   if (!fromHistory) {
     try {
