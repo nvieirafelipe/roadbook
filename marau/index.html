@@ -1107,12 +1107,22 @@ function tileXY(lng, lat, z) {
   const n = 2 ** z, r = lat * Math.PI / 180;
   return [(lng + 180) / 360 * n, (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n];
 }
-/* Strip along the route: 1 tile of margin up to zoom 12, only the line at 13,
-   and the surroundings of the stops at 13 and 14 */
-function routeTiles() {
+/* Map tiles along the route: from zoom 0, since the whole-trip view opens at about zoom 4, up to
+   12 with 1 tile of margin, only the line at 13, and the surroundings of the stops at 13 and 14 */
+const ROUTE_LEVELS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((z) => [z, 1]).concat([[13, 0]]);
+const STOP_LEVELS = [13, 14];
+/* Label ranges: Latin, its extensions and punctuation for the Portuguese names, plus the scripts of
+   the second-language names some places carry (Greek, Cyrillic, Hebrew, Arabic). A label using
+   a range not listed here may miss those characters without signal. */
+/* Goes up whenever the download covers more: a map saved by an older plan stops counting as saved */
+const DOWNLOAD_PLAN = 2;
+const GLYPH_RANGES = ["0-255", "256-511", "512-767", "768-1023", "1024-1279", "1280-1535", "1536-1791",
+  "7680-7935", "8192-8447", "8448-8703"];
+function routeTiles(levels, stopLevels) {
   const coords = routeIndex.coords, out = new Set();
-  const add = (z, x, y) => out.add(z + "/" + x + "/" + y);
-  [[5, 1], [6, 1], [7, 1], [8, 1], [9, 1], [10, 1], [11, 1], [12, 1], [13, 0]].forEach(([z, buf]) => {
+  /* At the lowest zooms the margin would step past the edge of the world */
+  const add = (z, x, y) => { if (x >= 0 && y >= 0 && x < 2 ** z && y < 2 ** z) out.add(z + "/" + x + "/" + y); };
+  levels.forEach(([z, buf]) => {
     for (let i = 1; i < coords.length; i++) {
       const [x0, y0] = tileXY(coords[i - 1][0], coords[i - 1][1], z);
       const [x1, y1] = tileXY(coords[i][0], coords[i][1], z);
@@ -1123,22 +1133,24 @@ function routeTiles() {
       }
     }
   });
-  [13, 14].forEach((z) => STOPS.forEach((s) => {
+  stopLevels.forEach((z) => STOPS.forEach((s) => {
     const [x, y] = tileXY(s.lng, s.lat, z).map(Math.floor);
     for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) add(z, x + dx, y + dy);
   }));
   return [...out];
 }
-/* Everything both styles need besides the tiles: style, tilejson, icons and labels */
+/* Everything both styles need besides the tiles (style, tilejson, icons and labels), and their
+   tile sources: the vector map, and the shaded relief images shown when zoomed out */
 async function styleAssets(cache, styleUrl) {
   const urls = new Set([styleUrl]);
   const style = await (await fetchInto(cache, styleUrl)).json();
-  let tileTemplate = null;
+  const tileSources = [];
   for (const src of Object.values(style.sources || {})) {
-    if (src.type !== "vector" || !src.url) continue;
-    urls.add(src.url);
-    const tj = await (await fetchInto(cache, src.url)).json();
-    if (tj.tiles && tj.tiles[0]) tileTemplate = tj.tiles[0];
+    if (src.type !== "vector" && src.type !== "raster") continue;
+    let tj = src;
+    if (src.url) { urls.add(src.url); tj = await (await fetchInto(cache, src.url)).json(); }
+    if (!tj.tiles || !tj.tiles[0]) continue;
+    tileSources.push({ type: src.type, template: tj.tiles[0], minzoom: src.minzoom ?? tj.minzoom ?? 0, maxzoom: src.maxzoom ?? tj.maxzoom ?? 14 });
   }
   [].concat(style.sprite || []).forEach((sp) => {
     const base = typeof sp === "string" ? sp : sp.url;
@@ -1149,9 +1161,9 @@ async function styleAssets(cache, styleUrl) {
     const f = l.layout && l.layout["text-font"];
     if (Array.isArray(f) && f.every((x) => typeof x === "string")) stacks.add(f.join(","));
   });
-  stacks.forEach((st) => ["0-255", "256-511", "8192-8447"].forEach((range) =>
+  stacks.forEach((st) => GLYPH_RANGES.forEach((range) =>
     urls.add(style.glyphs.replace("{fontstack}", encodeURI(st)).replace("{range}", range))));
-  return { urls: [...urls], tileTemplate };
+  return { urls: [...urls], tileSources };
 }
 async function fetchInto(cache, url) {
   const hit = await cache.match(url, { ignoreVary: true });
@@ -1173,7 +1185,7 @@ async function downloadOffline() {
   const cellular = navigator.connection && navigator.connection.type === "cellular";
   if (cellular && !store.get("offline") && Date.now() > downloadArmedUntil) {
     downloadArmedUntil = Date.now() + 10000;
-    offlineNote("Nos dados móveis, o mapa gasta de 30 a 80 MB. Toque de novo para baixar.");
+    offlineNote("Nos dados móveis, o mapa gasta uns 80 MB. Toque de novo para baixar.");
     return;
   }
   downloadArmedUntil = 0;
@@ -1188,11 +1200,17 @@ async function downloadOffline() {
     const cache = await caches.open(MAP_CACHE);
     const day = await styleAssets(cache, LIBERTY);
     const night = await styleAssets(cache, FIORD);
-    const template = day.tileTemplate || night.tileTemplate;
-    const tiles = template ? routeTiles().map((t) => {
-      const [z, x, y] = t.split("/");
-      return template.replace("{z}", z).replace("{x}", x).replace("{y}", y);
-    }) : [];
+    /* Both styles share their sources; the set keeps one copy of each tile. The relief only
+       exists up to its own maximum zoom, and isn't needed around the stops. */
+    const tiles = new Set();
+    [...day.tileSources, ...night.tileSources].forEach((s) => {
+      const vector = s.type === "vector";
+      const levels = vector ? ROUTE_LEVELS : ROUTE_LEVELS.filter(([z]) => z >= s.minzoom && z <= s.maxzoom);
+      routeTiles(levels, vector ? STOP_LEVELS : []).forEach((t) => {
+        const [z, x, y] = t.split("/");
+        tiles.add(s.template.replace("{z}", z).replace("{x}", x).replace("{y}", y));
+      });
+    });
     /* The page fonts, so the text does not change without signal */
     try {
       const css = await (await fetchInto(cache, FONTS_CSS)).text();
@@ -1214,7 +1232,7 @@ async function downloadOffline() {
       }
     };
     await Promise.all([worker(), worker(), worker(), worker()]);
-    store.set("offline", JSON.stringify({ at: Date.now(), count: doneCount, failed }));
+    store.set("offline", JSON.stringify({ at: Date.now(), count: doneCount, failed, plan: DOWNLOAD_PLAN }));
     if (failed) offlineNote(failed + " arquivos falharam. Toque de novo com sinal.");
     else if (!("serviceWorker" in navigator) || !navigator.serviceWorker.controller) {
       offlineNote("Mapa guardado, mas o modo sem internet ainda não está ativo. Recarregue a página com sinal.");
@@ -1244,6 +1262,10 @@ function renderOffline() {
   if (downloading) return;
   const info = JSON.parse(store.get("offline") || "null");
   if (!info) { setOfflineButton("idle", "Baixar mapa da rota"); return; }
+  if (info.plan !== DOWNLOAD_PLAN) {
+    setOfflineButton("idle", "O mapa guardado é de uma versão anterior da página. Toque para baixar de novo.");
+    return;
+  }
   const when = new Date(info.at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
   if (info.failed) {
     setOfflineButton("idle", "Mapa guardado em " + when + ", mas " + info.failed + " arquivos falharam. Toque para baixar de novo.");
